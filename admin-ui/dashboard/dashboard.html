@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="../css/cms-base.css">
     <link rel="stylesheet" href="../css/cms-layout.css">
     <link rel="stylesheet" href="../css/cms-components.css">
-    <link rel="stylesheet" href="../css/dashboard.css?v=16">
+    <link rel="stylesheet" href="../css/dashboard.css?v=17">
     <title>Dashboard | PSU Admin</title>
 </head>
 
@@ -104,20 +104,20 @@
 
         <section class="summary-cards" aria-label="Content overview metrics">
             <article class="summary-card">
-                <p>Published Pages</p>
-                <strong>48</strong>
+                <p>Academic Programs</p>
+                <strong data-metric="programs">&mdash;</strong>
             </article>
             <article class="summary-card">
                 <p>News Articles</p>
-                <strong>236</strong>
+                <strong data-metric="news">&mdash;</strong>
             </article>
             <article class="summary-card">
                 <p>Announcements</p>
-                <strong>96</strong>
+                <strong data-metric="announcements">&mdash;</strong>
             </article>
             <article class="summary-card">
                 <p>Upcoming Events</p>
-                <strong>12</strong>
+                <strong data-metric="upcomingEvents">&mdash;</strong>
             </article>
         </section>
 
@@ -126,21 +126,21 @@
                 <h2 id="quick-actions-heading">Quick Actions</h2>
             </div>
             <div class="quick-actions">
-                <button class="quick-action primary-action" type="button">
+                <a class="quick-action primary-action" href="../news/add-news.html">
                     <span aria-hidden="true">+</span>
                     <span>Add News</span>
-                </button>
-                <button class="quick-action" type="button">
+                </a>
+                <a class="quick-action" href="../announcements/add-announcement.html">
                     <span aria-hidden="true">+</span>
                     <span>Add Announcement</span>
-                </button>
-                <button class="quick-action" type="button">
+                </a>
+                <a class="quick-action" href="../events/add-event.html">
                     <span aria-hidden="true">+</span>
                     <span>Add Event</span>
-                </button>
-                <button class="quick-action" type="button">
+                </a>
+                <a class="quick-action" href="../resources/library.html">
                     <span>Upload Document</span>
-                </button>
+                </a>
             </div>
         </section>
 
@@ -158,7 +158,7 @@
                     <span><i class="legend-dot documents-dot"></i>Documents</span>
                     <span><i class="legend-dot other-dot"></i>Other</span>
                 </div>
-                <p class="chart-subtitle">Items published</p>
+                <p class="chart-subtitle" id="chartSubtitle">Items published</p>
                 <div class="chart-scroll">
                     <svg class="activity-chart" viewBox="0 0 960 240" role="img" aria-labelledby="activity-chart-title activity-chart-description">
                         <title id="activity-chart-title">Website content activity by month</title>
@@ -169,52 +169,11 @@
                             <line x1="0" y1="155" x2="960" y2="155"></line>
                             <line x1="0" y1="205" x2="960" y2="205"></line>
                         </g>
-                        <g class="chart-columns">
-                            <g class="chart-column"><text class="chart-month-label" x="40" y="225">Jan</text></g>
-                            <g class="chart-column"><text class="chart-month-label" x="120" y="225">Feb</text></g>
-                            <g class="chart-column"><text class="chart-month-label" x="200" y="225">Mar</text></g>
-                            <g class="chart-column"><text class="chart-month-label" x="280" y="225">Apr</text></g>
-                            <g class="chart-column"><text class="chart-month-label" x="360" y="225">May</text></g>
-                            <g class="chart-column"><text class="chart-month-label" x="440" y="225">Jun</text></g>
-                            <g class="chart-column"><text class="chart-month-label" x="520" y="225">Jul</text></g>
-                            <g class="chart-column">
-                                <text class="chart-month-label" x="600" y="225">Aug</text>
-                                <rect class="series-news" x="582" y="185.43" width="36" height="19.57"></rect>
-                                <rect class="series-announcements" x="582" y="172.39" width="36" height="13.04"></rect>
-                                <rect class="series-events" x="582" y="165.87" width="36" height="6.52"></rect>
-                                <rect class="series-documents" x="582" y="152.83" width="36" height="13.04"></rect>
-                                <rect class="series-other" x="582" y="146.30" width="36" height="6.52"></rect>
-                            </g>
-                            <g class="chart-column">
-                                <text class="chart-month-label" x="680" y="225">Sep</text>
-                                <rect class="series-news" x="662" y="172.39" width="36" height="32.61"></rect>
-                                <rect class="series-announcements" x="662" y="149.57" width="36" height="22.83"></rect>
-                                <rect class="series-events" x="662" y="136.52" width="36" height="13.04"></rect>
-                                <rect class="series-documents" x="662" y="116.96" width="36" height="19.57"></rect>
-                                <rect class="series-other" x="662" y="103.91" width="36" height="13.04"></rect>
-                            </g>
-                            <g class="chart-column">
-                                <text class="chart-month-label" x="760" y="225">Oct</text>
-                                <rect class="series-news" x="742" y="156.09" width="36" height="48.91"></rect>
-                                <rect class="series-announcements" x="742" y="123.48" width="36" height="32.61"></rect>
-                                <rect class="series-events" x="742" y="103.91" width="36" height="19.57"></rect>
-                                <rect class="series-documents" x="742" y="74.57" width="36" height="29.35"></rect>
-                                <rect class="series-other" x="742" y="55" width="36" height="19.57"></rect>
-                            </g>
-                            <g class="chart-column"><text class="chart-month-label" x="840" y="225">Nov</text></g>
-                            <g class="chart-column"><text class="chart-month-label" x="920" y="225">Dec</text></g>
-                        </g>
+                        <g class="chart-columns" id="activityColumns"></g>
                     </svg>
                     <table class="chart-data-table" aria-label="Monthly total item counts">
                         <tbody>
-                            <tr>
-                                <td></td><td></td><td></td><td></td><td></td><td></td>
-                                <td></td>
-                                <td><span class="chart-total">18 items</span></td>
-                                <td><span class="chart-total">31 items</span></td>
-                                <td><span class="chart-total latest-total">46 items</span></td>
-                                <td></td><td></td>
-                            </tr>
+                            <tr id="activityTotals"></tr>
                         </tbody>
                     </table>
                 </div>
@@ -226,44 +185,7 @@
                         <h2 id="recently-published-heading">Recently Published Content</h2>
                     </div>
                 </div>
-                <ul class="published-list">
-                    <li>
-                        <a class="published-item" href="#">
-                            <span class="content-thumbnail" aria-hidden="true"></span>
-                            <span class="published-copy">
-                                <strong>
-                                    <span>PSU Opens Enrollment</span>
-                                    <span class="published-status">Published</span>
-                                </strong>
-                                <span>News <span class="content-date">· Oct 28</span></span>
-                            </span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="published-item" href="#">
-                            <span class="content-thumbnail" aria-hidden="true"></span>
-                            <span class="published-copy">
-                                <strong>
-                                    <span>Midterm Examination Schedule</span>
-                                    <span class="published-status">Published</span>
-                                </strong>
-                                <span>Announcement <span class="content-date">· Oct 27</span></span>
-                            </span>
-                        </a>
-                    </li>
-                    <li>
-                        <a class="published-item" href="#">
-                            <span class="content-thumbnail" aria-hidden="true"></span>
-                            <span class="published-copy">
-                                <strong>
-                                    <span>Research Congress 2026</span>
-                                    <span class="published-status">Published</span>
-                                </strong>
-                                <span>Event <span class="content-date">· Oct 25</span></span>
-                            </span>
-                        </a>
-                    </li>
-                </ul>
+                <ul class="published-list" id="recentPublished"></ul>
             </article>
         </section>
 
@@ -283,32 +205,7 @@
                             <th scope="col">Time</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr>
-                            <td>Marlito Morales</td>
-                            <td>Published News</td>
-                            <td>PSU Opens Enrollment</td>
-                            <td><time datetime="PT10M">10 min ago</time></td>
-                        </tr>
-                        <tr>
-                            <td>Clove Dela Cruz</td>
-                            <td>Edited event</td>
-                            <td>Research Congress 2026</td>
-                            <td><time datetime="PT1H">1 hr ago</time></td>
-                        </tr>
-                        <tr>
-                            <td>Leomord Gonzales</td>
-                            <td>Uploaded document</td>
-                            <td>Student Handbook 2026.pdf</td>
-                            <td><time datetime="PT3H">3 hr ago</time></td>
-                        </tr>
-                        <tr>
-                            <td>Dranrev Eslao</td>
-                            <td>Added personnel</td>
-                            <td>Dr. Liza Manuel</td>
-                            <td><time datetime="2026-11-15">Yesterday</time></td>
-                        </tr>
-                    </tbody>
+                    <tbody id="recentActivity"></tbody>
                 </table>
             </div>
         </section>
@@ -322,6 +219,8 @@
     <script src="../js/storage.js"></script>
     <script src="../js/ui.js"></script>
     <script src="../js/layout.js"></script>
+    <script src="../js/api-client.js"></script>
+    <script src="../js/dashboard.js"></script>
 </body>
 
 </html>

@@ -984,3 +984,15 @@ h1 {
     padding: 16px;
   }
 }
+
+/* Live dashboard: anchors styled as quick actions, empty states, thumbnails */
+a.quick-action { text-decoration: none; }
+a.quick-action:hover { text-decoration: none; }
+.dashboard-empty {
+  margin: 0;
+  padding: 14px 0;
+  color: #697386;
+  font-size: 12px;
+  list-style: none;
+}
+.activity-table .dashboard-empty { padding: 14px 12px; text-align: center; }

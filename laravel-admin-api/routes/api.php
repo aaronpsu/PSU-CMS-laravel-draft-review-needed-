@@ -1,12 +1,14 @@
 <?php
 
 use App\Http\Controllers\CmsContentController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Middleware\LocalPrototypeOnly;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(LocalPrototypeOnly::class)->group(function (): void {
     Route::get('/health', [CmsContentController::class, 'health']);
     Route::get('/options', [CmsContentController::class, 'options']);
+    Route::get('/dashboard', DashboardController::class);
 
     Route::get('/news', [CmsContentController::class, 'newsIndex']);
     Route::get('/news/{id}', [CmsContentController::class, 'newsShow'])->whereNumber('id');
