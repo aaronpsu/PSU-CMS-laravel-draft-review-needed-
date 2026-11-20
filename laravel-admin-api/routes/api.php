@@ -1,11 +1,25 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\CmsContentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HomepageManagementController;
 use App\Http\Middleware\LocalPrototypeOnly;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(LocalPrototypeOnly::class)->group(function (): void {
+    // Homepage Management
+    Route::prefix('homepage')->controller(HomepageManagementController::class)->group(function (): void {
+        Route::get('/', 'index');
+        Route::get('/settings', 'getSettings');
+        Route::put('/settings', 'saveSettings');
+        Route::get('/banners', 'getBanners');
+        Route::post('/banners', 'addBanner');
+        Route::put('/banners/{id}', 'updateBanner');
+        Route::delete('/banners/{id}', 'deleteBanner');
+        Route::get('/content/{type}', 'getContentOptions');
+        Route::get('/featured', 'getFeaturedItems');
+        Route::put('/featured', 'saveFeaturedItems');
+    });
     Route::get('/health', [CmsContentController::class, 'health']);
     Route::get('/options', [CmsContentController::class, 'options']);
     Route::get('/dashboard', DashboardController::class);
@@ -93,3 +107,8 @@ Route::middleware(LocalPrototypeOnly::class)->group(function (): void {
     Route::get('/media/{id}', [CmsContentController::class, 'mediaShow'])->whereNumber('id')->name('cms.media');
     Route::get('/documents/{id}', [CmsContentController::class, 'documentShow'])->whereNumber('id')->name('cms.document');
 });
+
+// Public Homepage data
+Route::get('/homepage/public', [HomepageManagementController::class, 'publicHomepage']);
+
+
