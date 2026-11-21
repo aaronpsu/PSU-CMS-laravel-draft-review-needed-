@@ -10,8 +10,9 @@ class LocalPrototypeOnly
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Keep prototype API disabled in production, but do not reject local
+        // development requests based on the browser's network interface/IP.
         abort_unless(app()->environment(['local', 'testing']), 403);
-        abort_unless(in_array($request->ip(), ['127.0.0.1', '::1'], true), 403);
 
         return $next($request);
     }
