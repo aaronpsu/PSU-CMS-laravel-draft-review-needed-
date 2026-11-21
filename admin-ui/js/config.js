@@ -56,7 +56,7 @@ CMS.config = {
   imageMaxFileBytes: 5 * 1024 * 1024,   // reject files bigger than this
   imageMaxWidth: 1200,                  // pictures are scaled down before saving
   imageQuality: 0.82,                   // JPEG quality used when scaling
-  documentMaxFileBytes: 12 * 1024 * 1024, // same limit as the PHP upload code
+  documentMaxFileBytes: 300 * 1024, // matches the server attachment limit
 
   /* ---- Links (relative to a page inside admin-ui/<module>/) ------------- */
   publicSiteUrl: '../../index.php',

@@ -19,16 +19,19 @@ A feature-focused PHP 8+ and MySQL CMS based on the system features in `teams-an
 
 PHP 8.0+ with PDO MySQL, Fileinfo, mbstring, and GD extensions; MySQL 5.7+ or MariaDB 10.3+; Apache with `mod_rewrite`/`.htaccess` support or equivalent server rules. GD is required for image uploads: uploaded images are re-encoded server-side (strips EXIF metadata and polyglot payloads), and image uploads fail safely if GD is not available.
 
-## Install
+## Run the current admin UI locally
 
-1. Create a MySQL database and a dedicated database user with only the privileges this application needs. Import `schema.sql` (it creates `psu_cms` if needed).
-2. Copy `config.sample.php` to `config.php`, then set the database credentials and site name. Do not deploy with a root or passwordless database account.
-3. Point the web server document root to this directory and ensure PHP can write to `uploads/`.
-4. Open `setup.php` and create the first admin using a password with at least 12 characters.
-5. Delete or restrict `setup.php` after the first administrator has been created.
-6. Sign in at `admin.php`; add pages and content, then set each item to Published when ready.
+The current administration panel uses the Laravel API and the `psu_cms_admin` database:
 
-Existing installations should run `migrations/2026-10-21-security-hardening.sql` once (creates the `login_attempts` table used by login throttling) and `migrations/2026-10-27-feedback-throttle.sql` once (creates the `feedback_attempts` table used by the persistent feedback rate limit). If a table is missing, the application self-heals by creating it opportunistically and logs the problem.
+1. Import `psu_cms_admin.sql` into MySQL and create a dedicated database account.
+2. In `laravel-admin-api`, copy `.env.example` to `.env`, set the database credentials, then run `composer install`, `php artisan key:generate`, and `php artisan migrate`. Back up the database before migrating.
+3. Start the API from `laravel-admin-api` with `php artisan serve --host 127.0.0.1 --port 8001`.
+4. In a second terminal at the repository root, start the public site with `php -S 127.0.0.1:8000`.
+5. Open `http://127.0.0.1:8000/admin-ui/`.
+
+The API is loopback-only for local development and is not production-ready. Seed passwords are placeholders; configure a valid password hash for an active account before signing in. The root PHP site uses a separate, ignored `config.php`; keep its local settings private and do not replace it casually.
+
+The older PHP admin pages use their own schema and migrations; they are separate from the current `admin-ui/` and Laravel API.
 
 ## Security notes
 

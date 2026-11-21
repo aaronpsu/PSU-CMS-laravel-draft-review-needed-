@@ -3,15 +3,21 @@
   var departments = [], colleges = [], faculty = [];
   var state = { q: '', college: '', status: '', page: 1 };
   var pageSize = 10;
+  var departmentRequest = 0;
 
   function fetchDepartments() {
+    var requestId = ++departmentRequest;
     return CMS.api.query('/departments', {
       q: state.q,
       college: state.college,
       status: state.status
     }).then(function (rows) {
+      if (requestId !== departmentRequest) return;
       departments = rows;
       renderList();
+    }).catch(function (error) {
+      if (requestId !== departmentRequest) return;
+      throw error;
     });
   }
 
@@ -158,6 +164,7 @@
     var editId = ui.getParam('id');
     var existing = null;
     var headPicker = null;
+    var saving = false;
     saveButton.disabled = true;
 
     Promise.all([
@@ -210,6 +217,7 @@
 
     form.addEventListener('submit', function (event) {
       event.preventDefault();
+      if (saving) return;
       ui.clearErrors(form);
       var name = fields.name.value.trim();
       var code = fields.code.value.trim().toUpperCase();
@@ -245,11 +253,16 @@
       var request = existing
         ? CMS.api.put('/departments/' + encodeURIComponent(existing.id), payload)
         : CMS.api.post('/departments', payload);
+      saving = true;
+      saveButton.disabled = true;
       request.then(function () {
         ui.flash(existing ? 'Department updated.' : 'Department added.', 'success');
         window.location.href = 'departments.html';
       }).catch(function (error) {
         ui.toast(error.message, 'error');
+      }).then(function () {
+        saving = false;
+        saveButton.disabled = colleges.length === 0;
       });
     });
   }

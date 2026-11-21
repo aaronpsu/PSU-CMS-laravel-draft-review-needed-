@@ -23,6 +23,7 @@
     var statusSel = document.getElementById('newsFilterStatus');
     var dateSel = document.getElementById('newsFilterDate');
     var campusSel = document.getElementById('newsFilterCampus');
+    var loadRequest = 0;
 
     ui.setOptions(statusSel, [{ value: '', label: 'All Status' }].concat(cfg.newsStatuses), '');
     ui.setOptions(dateSel, [
@@ -73,8 +74,12 @@
     }
 
     function load() {
+      var requestId = ++loadRequest;
       CMS.api.query('/news', { q: state.q, category: state.category, status: state.status, date: state.date, campus: state.campus })
-        .then(render).catch(function (error) {
+        .then(function (rows) {
+          if (requestId === loadRequest) render(rows);
+        }).catch(function (error) {
+          if (requestId !== loadRequest) return;
           tableWrap.hidden = true; emptyBox.hidden = false; ui.clear(footer);
           ui.renderEmpty(emptyBox, { title: 'Could not load news', text: error.message });
         });
@@ -116,6 +121,7 @@
   /* ======================= Add / Edit News (form) ======================= */
   async function initForm() {
     var form = document.getElementById('newsForm');
+    var saveButtons = [document.getElementById('newsSaveDraft'), document.getElementById('newsPublish')];
     var f = {
       title: document.getElementById('newsTitle'), category: document.getElementById('newsCategory'),
       author: document.getElementById('newsAuthor'), campus: document.getElementById('newsCampus'),
@@ -129,7 +135,7 @@
     var image = '';
 
     /* edit mode: ?id=... */
-    var editing = null, editId = ui.getParam('id'), options;
+    var editing = null, editId = ui.getParam('id'), options, saving = false;
     try {
       options = await CMS.api.get('/options');
       if (editId) editing = await CMS.api.get('/news/' + encodeURIComponent(editId));
@@ -201,8 +207,11 @@
 
     /* Publish -> Published. Save as Draft -> the chosen status, unless it says Published. */
     async function save(mode) {
+      if (saving) return;
       var status = mode === 'publish' ? 'published' : (f.status.value === 'published' ? 'draft' : f.status.value);
       if (!validate(status)) return;
+      saving = true;
+      saveButtons.forEach(function (button) { button.disabled = true; });
       var record = {
         title: f.title.value.trim(), categoryId: Number(f.category.value), author: f.author.value.trim() || cfg.currentUser.name,
         campusId: f.campus && f.campus.value ? Number(f.campus.value) : null,
@@ -215,9 +224,13 @@
         ui.flash(status === 'published' ? 'News article published.' : editing ? 'News article updated.' : 'News article saved.', 'success');
         window.location.href = 'all-news.html';
       } catch (error) { ui.toast(error.message, 'error'); }
+      finally {
+        saving = false;
+        saveButtons.forEach(function (button) { button.disabled = false; });
+      }
     }
-    document.getElementById('newsSaveDraft').addEventListener('click', function () { save('draft'); });
-    document.getElementById('newsPublish').addEventListener('click', function () { save('publish'); });
+    saveButtons[0].addEventListener('click', function () { save('draft'); });
+    saveButtons[1].addEventListener('click', function () { save('publish'); });
     form.addEventListener('submit', function (e) { e.preventDefault(); });   // Enter key must not reload the page
   }
 

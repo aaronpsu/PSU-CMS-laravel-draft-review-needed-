@@ -164,7 +164,7 @@
       var options = results[0];
       departments = options.departments;
       var program = id ? results[1] : null;
-      var degreeLevels = options.degreeLevels.length ? options.degreeLevels : CMS.config.degreeLevels;
+      var degreeLevels = Array.from(new Set(CMS.config.degreeLevels.concat(options.degreeLevels)));
       ui.setOptions(f.level, degreeLevels.map(function (level) { return { value: level, label: level }; }), program ? program.degreeLevel : '');
       ui.setOptions(f.college, [{ value: '', label: 'Select a college' }].concat(options.colleges.map(function (college) {
         return { value: college.id, label: college.name };

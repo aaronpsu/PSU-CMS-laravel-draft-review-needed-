@@ -240,7 +240,7 @@ CMS.ui = (function () {
       [].forEach.call(select.options, function (opt, i) {
         var li = el('li', { class: 'cms-select-option', role: 'option', 'data-index': i, text: opt.text,
                             'aria-selected': opt.selected ? 'true' : 'false' });
-        li.addEventListener('mousedown', function (e) { e.preventDefault(); choose(i); });
+        li.addEventListener('pointerdown', function (e) { e.preventDefault(); choose(i); });
         menu.appendChild(li);
       });
       sync();

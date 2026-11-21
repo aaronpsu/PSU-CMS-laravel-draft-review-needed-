@@ -21,6 +21,7 @@
     var crumb = document.getElementById('eventCrumb');
     var crumbView = document.getElementById('eventCrumbView');
     var state = { q: '', category: '', status: '', date: '', page: 1, view: startView(), rows: [] };
+    var loadRequest = 0;
     var calendar = CMS.eventCalendar.init({
       root: calWrap,
       /* the calendar shows published events only (drafts are not in its legend) */
@@ -117,8 +118,10 @@
     }
 
     function render() {
+      var requestId = ++loadRequest;
       CMS.api.query('/events', { q: state.q, category: state.category, status: state.status, date: state.date })
         .then(function (rows) {
+          if (requestId !== loadRequest) return;
           state.rows = rows;
           var isCalendar = state.view === 'calendar';
           updateCrumb(rows.length);
@@ -130,6 +133,7 @@
             renderList(rows);
           }
         }).catch(function (error) {
+          if (requestId !== loadRequest) return;
           tableWrap.hidden = true; calWrap.hidden = true; emptyBox.hidden = false; ui.clear(footer);
           ui.renderEmpty(emptyBox, { title: 'Could not load events', text: error.message });
         });
@@ -188,6 +192,7 @@
   /* ======================= Add / Edit Event (form) ======================= */
   async function initForm() {
     var form = document.getElementById('eventForm');
+    var saveButtons = [document.getElementById('eventSaveDraft'), document.getElementById('eventPublish')];
     var f = {
       title: document.getElementById('eventTitle'), description: document.getElementById('eventDescription'),
       category: document.getElementById('eventCategory'), venue: document.getElementById('eventVenue'),
@@ -200,7 +205,7 @@
     var removeBtn = document.getElementById('eventBannerRemove');
     var banner = '';
 
-    var editing = null, editId = ui.getParam('id');
+    var editing = null, editId = ui.getParam('id'), saving = false;
     if (editId) {
       try { editing = await CMS.api.get('/events/' + encodeURIComponent(editId)); }
       catch (error) { ui.flash(error.message, 'error'); window.location.href = 'all-events.html'; return; }
@@ -273,8 +278,11 @@
     }
 
     async function save(mode) {
+      if (saving) return;
       var state = mode === 'publish' ? 'published' : 'draft';
       if (!validate(state)) return;
+      saving = true;
+      saveButtons.forEach(function (button) { button.disabled = true; });
       var record = {
         title: f.title.value.trim(), description: f.description.value.trim(), categoryId: Number(f.category.value), banner: banner,
         venue: f.venue.value.trim(), startDate: f.startDate.value, endDate: f.endDate.value || f.startDate.value,
@@ -286,9 +294,13 @@
         ui.flash(state === 'published' ? 'Event published.' : editing ? 'Event updated.' : 'Event saved as a draft.', 'success');
         window.location.href = 'all-events.html';
       } catch (error) { ui.toast(error.message, 'error'); }
+      finally {
+        saving = false;
+        saveButtons.forEach(function (button) { button.disabled = false; });
+      }
     }
-    document.getElementById('eventSaveDraft').addEventListener('click', function () { save('draft'); });
-    document.getElementById('eventPublish').addEventListener('click', function () { save('publish'); });
+    saveButtons[0].addEventListener('click', function () { save('draft'); });
+    saveButtons[1].addEventListener('click', function () { save('publish'); });
     form.addEventListener('submit', function (e) { e.preventDefault(); });
   }
 

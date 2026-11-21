@@ -6,9 +6,18 @@ error_reporting(E_ALL);
 $configFile = __DIR__ . '/config.php';
 if (!is_file($configFile)) {
     http_response_code(503);
-    exit('Setup required: copy config.sample.php to config.php, set database credentials, import schema.sql, then open setup.php.');
+    exit('Setup required: create a local config.php with database settings. See README.md for the current setup steps.');
 }
 $config = require $configFile;
+$isLoopbackRequest = in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true);
+$usesForwardedAddress = !empty($_SERVER['HTTP_X_FORWARDED_FOR'])
+    || !empty($_SERVER['HTTP_X_REAL_IP'])
+    || !empty($_SERVER['HTTP_FORWARDED']);
+if ((strtolower(trim((string) ($config['db_user'] ?? ''))) === 'root' || trim((string) ($config['db_pass'] ?? '')) === '')
+    && (! $isLoopbackRequest || $usesForwardedAddress)) {
+    http_response_code(503);
+    exit('Use a dedicated database account with a password before allowing non-local access.');
+}
 const DUMMY_PASSWORD_HASH = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
 
 function is_https(): bool
@@ -76,7 +85,7 @@ try {
     ]);
 } catch (Throwable $e) {
     http_response_code(503);
-    exit('Cannot connect to MySQL. Check config.php and schema.sql.');
+    exit('Cannot connect to MySQL. Check config.php and confirm the configured database is available.');
 }
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -267,9 +276,13 @@ function cleanup_orphaned_upload(PDO $pdo, ?string $path, string $folder): void
 function client_ip(): string
 {
     global $config;
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    if (!empty($config['trust_proxy_headers']) && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-        $ip = explode(',', (string) $_SERVER['HTTP_X_FORWARDED_FOR'])[0];
+    $remote = trim((string) ($_SERVER['REMOTE_ADDR'] ?? ''));
+    $trusted = $config['trusted_proxy_ips'] ?? [];
+    $ip = $remote;
+    if (!empty($config['trust_proxy_headers']) && in_array($remote, $trusted, true)
+        && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $parts = array_values(array_filter(array_map('trim', explode(',', (string) $_SERVER['HTTP_X_FORWARDED_FOR']))));
+        $ip = !empty($parts) ? $parts[count($parts) - 1] : $remote;
     }
     return substr(trim((string) $ip), 0, 45);
 }
@@ -336,10 +349,19 @@ function security_log(string $event, array $context = []): void
     error_log($event . ' ' . json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
 }
 
+function public_site_settings(PDO $pdo): array
+{
+    return $pdo->query('SELECT setting_key, setting_value FROM site_settings')->fetchAll(PDO::FETCH_KEY_PAIR);
+}
+
 function site_header(string $title = ''): void
 {
     global $config, $pdo;
-    $site = $config['site_name'] ?? 'PSU Urdaneta CMS';
+    $settings = public_site_settings($pdo);
+    $site = trim((string) ($settings['website_name'] ?? '')) ?: ($config['site_name'] ?? 'PSU Urdaneta CMS');
+    $university = trim((string) ($settings['university_name'] ?? '')) ?: $site;
+    $logoId = filter_var($settings['logo_media_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+    $logoUrl = $logoId ? 'media.php?id=' . $logoId : 'assets/psu-logo.jpg';
     $activeNav = null;
     if (basename($_SERVER['PHP_SELF'] ?? '') === 'index.php') {
         if (isset($_GET['contact'])) {
@@ -365,7 +387,7 @@ function site_header(string $title = ''): void
         'directory' => ['Directory', 'index.php?type=directory'],
         'contact' => ['Contact', 'index.php?contact=1'],
     ];
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . h($title ? "$title | $site" : $site) . '</title><link rel="stylesheet" href="assets/style.css?v=portal-clone2"></head><body' . $bodyClass . '><header class="top"><div class="portal-masthead"><a class="brand" href="index.php"><img class="psu-logo" src="assets/psu-logo.jpg" alt="Pangasinan State University logo"><span class="brand-copy"><strong>PANGASINAN STATE UNIVERSITY</strong><small>Urdaneta City Campus</small></span></a><span class="portal-title">CAMPUS PORTAL</span></div><nav>';
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . h($title ? "$title | $site" : $site) . '</title><link rel="stylesheet" href="assets/style.css?v=portal-clone2"></head><body' . $bodyClass . '><header class="top"><div class="portal-masthead"><a class="brand" href="index.php"><img class="psu-logo" src="' . h($logoUrl) . '" alt="' . h($university) . ' logo"><span class="brand-copy"><strong>' . h($university) . '</strong><small>Urdaneta City Campus</small></span></a><span class="portal-title">CAMPUS PORTAL</span></div><nav>';
     foreach ($links as $key => [$label, $href]) {
         $current = $activeNav === $key ? ' class="current" aria-current="page"' : '';
         echo '<a href="' . h($href) . '"' . $current . '>' . h($label) . '</a>';
@@ -375,5 +397,8 @@ function site_header(string $title = ''): void
 
 function site_footer(): void
 {
-    echo '</main><footer class="footer">University Content Management System</footer><script src="assets/app.js" defer></script></body></html>';
+    global $pdo;
+    $settings = public_site_settings($pdo);
+    $site = trim((string) ($settings['website_name'] ?? '')) ?: 'University Content Management System';
+    echo '</main><footer class="footer">' . h($site) . '</footer><script src="assets/app.js" defer></script></body></html>';
 }

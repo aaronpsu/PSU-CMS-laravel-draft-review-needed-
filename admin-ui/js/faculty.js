@@ -3,16 +3,22 @@
   var faculty = [], departments = [];
   var state = { q: '', department: '', page: 1 };
   var pageSize = 10;
+  var loadRequest = 0;
 
   function load() {
+    var requestId = ++loadRequest;
     return Promise.all([
       CMS.api.query('/faculty', { q: state.q, department: state.department }),
       CMS.api.get('/options')
     ]).then(function (results) {
+      if (requestId !== loadRequest) return;
       faculty = results[0];
       departments = results[1].departments;
       renderDepartmentOptions();
       render();
+    }).catch(function (error) {
+      if (requestId !== loadRequest) return;
+      throw error;
     });
   }
 
@@ -144,6 +150,7 @@
       var request = editing
         ? CMS.api.put('/faculty/' + encodeURIComponent(person.id), payload)
         : CMS.api.post('/faculty', payload);
+      save.disabled = true;
       request.then(function () {
         state.page = 1;
         return load();
@@ -152,6 +159,8 @@
         ui.toast(editing ? 'Personnel record updated.' : 'Personnel record added.', 'success');
       }).catch(function (error) {
         ui.toast(error.message, 'error');
+      }).then(function () {
+        save.disabled = false;
       });
     });
   }

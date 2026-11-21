@@ -13,23 +13,29 @@
   function terms(q) { return String(q || '').toLowerCase().split(/\s+/).filter(Boolean); }
 
   function run(q, type, ctx) {
-    var t = terms(q), found = [];
-    if (!t.length) return found;
-    sources.forEach(function (src) {
-      if (type && type !== src.id) return;
-      src.collect(ctx).forEach(function (item) {
-        var title = String(item.title || '').toLowerCase();
-        var hay = [title, String(item.summary || '').toLowerCase()].concat((item.extra || []).map(function (x) { return String(x || '').toLowerCase(); })).join(' ');
-        if (!t.every(function (w) { return hay.indexOf(w) !== -1; })) return;
-        var score = 0;
-        t.forEach(function (w) { score += title.indexOf(w) !== -1 ? 3 : 1; });
-        found.push({ source: src, item: item, score: score });
+    var t = terms(q);
+    if (!t.length) return Promise.resolve([]);
+    var jobs = sources.filter(function (src) { return !type || type === src.id; }).map(function (src) {
+      return Promise.resolve(src.collect(ctx)).then(function (items) {
+        var found = [];
+        (items || []).forEach(function (item) {
+          var title = String(item.title || '').toLowerCase();
+          var hay = [title, String(item.summary || '').toLowerCase()].concat((item.extra || []).map(function (x) { return String(x || '').toLowerCase(); })).join(' ');
+          if (!t.every(function (w) { return hay.indexOf(w) !== -1; })) return;
+          var score = 0;
+          t.forEach(function (w) { score += title.indexOf(w) !== -1 ? 3 : 1; });
+          found.push({ source: src, item: item, score: score });
+        });
+        return found;
+      }).catch(function () { return []; });
+    });
+    return Promise.all(jobs).then(function (groups) {
+      var found = [].concat.apply([], groups);
+      found.sort(function (a, b) {
+        return b.score - a.score || String(b.item.date || '').localeCompare(String(a.item.date || '')) || String(a.item.title).localeCompare(String(b.item.title));
       });
+      return found;
     });
-    found.sort(function (a, b) {
-      return b.score - a.score || String(b.item.date || '').localeCompare(String(a.item.date || '')) || String(a.item.title).localeCompare(String(b.item.title));
-    });
-    return found;
   }
 
   /* a short piece of the summary around the first match (only when the title itself does not match) */
@@ -46,6 +52,7 @@
   /* ---------- page ---------- */
   function init() {
     var state = { q: (ui.getParam('q') || '').trim(), type: ui.getParam('type') || '', campus: ui.getParam('campus') || '' };
+    state.request = 0;
     if (!sources.some(function (s) { return s.id === state.type; })) state.type = '';
 
     var form = document.getElementById('searchForm');
@@ -115,7 +122,9 @@
       status.textContent = '';
       if (!state.q) { resultsBox.hidden = true; crumb.textContent = 'Global Search'; return; }
       resultsBox.hidden = false;
-      var found = run(state.q, state.type, { campus: state.campus });
+      var request = ++state.request;
+      run(state.q, state.type, { campus: state.campus }).then(function (found) {
+      if (request !== state.request) return;
       status.textContent = found.length + (found.length === 1 ? ' result' : ' results') + ' found';
       crumb.textContent = found.length ? 'Global Search' : 'Global Search \u2013 No Results';
       if (state.campus) {
@@ -129,6 +138,7 @@
       var list = el('ul', { class: 'search-result-list' });
       found.forEach(function (r) { list.appendChild(resultRow(r)); });
       resultsBox.appendChild(list);
+      });
     }
 
     /* the query stays in both search boxes */

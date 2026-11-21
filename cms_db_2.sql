@@ -248,8 +248,8 @@ CREATE TABLE `programs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `programs` (`program_id`, `college_id`, `department_id`, `code`, `name`, `slug`, `degree_level`, `description`, `status`, `created_by`, `updated_by`, `created_at`, `updated_at`) VALUES
-(1, 1, 1, 'BSCPE', 'BS in Information Technology', 'bs-information-technology', 'Bachelor', 'Four-year program in information technology.', 'active', 1, 1, '2026-11-16 10:01:52', '2026-11-16 10:19:16'),
-(2, 2, 2, 'BSBIO', 'BS in Computer Engineering', 'bs-computer-engineering', 'Bachelor', 'Four-year program in computer engineering.', 'active', 1, 1, '2026-11-16 10:01:52', '2026-11-16 10:19:44');
+(1, 1, 1, 'BSIT', 'BS in Information Technology', 'bs-information-technology', 'Bachelor', 'Four-year program in information technology.', 'active', 1, 1, '2026-11-16 10:01:52', '2026-11-16 10:19:16'),
+(2, 2, 2, 'BSCPE', 'BS in Computer Engineering', 'bs-computer-engineering', 'Bachelor', 'Four-year program in computer engineering.', 'active', 1, 1, '2026-11-16 10:01:52', '2026-11-16 10:19:44');
 
 CREATE TABLE `users` (
   `user_id` int(10) UNSIGNED NOT NULL,
@@ -263,8 +263,8 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO `users` (`user_id`, `full_name`, `email`, `password_hash`, `role`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'Maria Santos', 'maria.santos@university.edu', 'admin123', 'admin', 'active', '2026-11-16 10:01:52', '2026-11-16 10:20:43'),
-(2, 'John Reyes', 'john.reyes@university.edu', 'editor123', 'editor', 'active', '2026-11-16 10:01:52', '2026-11-16 10:21:00');
+(1, 'Maria Santos', 'maria.santos@university.edu', '$2b$12$nMP0ASAzDUdPAQbnPSS8tu2pHMkwrewKs0plNLcWM1VDgphjb5FAy', 'admin', 'active', '2026-11-16 10:01:52', '2026-11-16 10:20:43'),
+(2, 'John Reyes', 'john.reyes@university.edu', '$2b$12$TgTYpcxmVQSmNXQDWHaq/.IanuriVaWZEyIMpMIh8iblMT/E9v8OW', 'editor', 'active', '2026-11-16 10:01:52', '2026-11-16 10:21:00');
 
 
 ALTER TABLE `announcements`

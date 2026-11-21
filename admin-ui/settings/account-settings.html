@@ -113,23 +113,10 @@
       <!-- PHP: method="post" action="account-settings.php" + hidden CSRF input here -->
       <form id="accountForm" novalidate>
         <div class="cms-card cms-form-card">
-          <div class="cms-field">
-            <span class="cms-label">Administrator Profile Picture</span>
-            <div class="cms-upload">
-              <div class="cms-upload-preview account-photo" id="accountPhoto">Profile Picture</div>
-              <input type="file" id="accountPhotoInput" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
-              <button type="button" class="cms-btn cms-btn-soft" id="accountPhotoBtn">Upload Image</button>
-            </div>
-          </div>
           <div class="cms-form-row">
             <div class="cms-field">
               <label class="cms-label" for="accountName">Full Name</label>
               <input class="cms-input" id="accountName" type="text" maxlength="120" autocomplete="name">
-              <p class="cms-field-error" role="alert"></p>
-            </div>
-            <div class="cms-field">
-              <label class="cms-label" for="accountUsername">Username</label>
-              <input class="cms-input" id="accountUsername" type="text" maxlength="30" autocomplete="username">
               <p class="cms-field-error" role="alert"></p>
             </div>
           </div>
@@ -137,18 +124,6 @@
             <div class="cms-field">
               <label class="cms-label" for="accountEmail">Email Address</label>
               <input class="cms-input" id="accountEmail" type="email" maxlength="190" autocomplete="email">
-              <p class="cms-field-error" role="alert"></p>
-            </div>
-            <div class="cms-field">
-              <label class="cms-label" for="accountNewPassword">New Password</label>
-              <input class="cms-input" id="accountNewPassword" type="password" placeholder="Enter new password" autocomplete="new-password" data-password-toggle>
-              <p class="cms-field-error" role="alert"></p>
-            </div>
-          </div>
-          <div class="cms-form-row">
-            <div class="cms-field">
-              <label class="cms-label" for="accountConfirmPassword">Confirm Password</label>
-              <input class="cms-input" id="accountConfirmPassword" type="password" placeholder="Enter confirm password" autocomplete="new-password" data-password-toggle>
               <p class="cms-field-error" role="alert"></p>
             </div>
           </div>
@@ -169,6 +144,7 @@
   <script src="../js/storage.js"></script>
   <script src="../js/message-store.js"></script>
   <script src="../js/settings-store.js"></script>
+  <script src="../js/api-client.js"></script>
   <script src="../js/ui.js"></script>
   <script src="../js/layout.js"></script>
   <script src="../js/account.js"></script>

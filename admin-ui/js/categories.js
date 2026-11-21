@@ -75,8 +75,10 @@
       var modal = ui.openModal(modalEl);
       modalEl.addEventListener('shown.bs.modal', function () { nameInput.focus(); });
       nameInput.addEventListener('input', function () { nameField.classList.remove('has-error'); nameInput.classList.remove('is-invalid'); });
+      var saving = false;
 
       function submit() {
+        if (saving) return;
         ui.clearErrors(modalEl);
         var name = nameInput.value.trim().replace(/\s+/g, ' ');
         if (!name) { ui.setError(nameInput, 'Please enter a category name.'); nameInput.focus(); return; }
@@ -86,11 +88,16 @@
         var save = c
           ? CMS.api.put('/event-categories/' + encodeURIComponent(c.id), record)
           : CMS.api.post('/event-categories', record);
+        saving = true;
+        saveBtn.disabled = true;
         save.then(function () { return refreshData(); }).then(function () {
           modal.hide();
           ui.toast(c ? 'Category updated.' : 'Category added.', 'success');
           render();
-        }).catch(function (error) { ui.toast(error.message, 'error'); });
+        }).catch(function (error) { ui.toast(error.message, 'error'); }).then(function () {
+          saving = false;
+          saveBtn.disabled = false;
+        });
       }
       saveBtn.addEventListener('click', submit);
       nameInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); submit(); } });

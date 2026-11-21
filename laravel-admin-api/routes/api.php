@@ -3,10 +3,42 @@
 use App\Http\Controllers\CmsContentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomepageManagementController;
+use App\Http\Controllers\AuthController;
+use App\Http\Controllers\SiteSettingsController;
 use App\Http\Middleware\LocalPrototypeOnly;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(LocalPrototypeOnly::class)->group(function (): void {
+Route::middleware([LocalPrototypeOnly::class, 'web'])
+    ->prefix('auth')
+    ->controller(AuthController::class)
+    ->group(function (): void {
+        Route::get('/csrf', 'csrf');
+        Route::post('/login', 'login')->middleware('cms.json');
+
+        Route::middleware(['auth:web', 'cms.json'])->group(function (): void {
+            Route::get('/me', 'me');
+            Route::get('/notifications', 'notifications');
+            Route::put('/notifications/{id}/read', 'markNotificationRead')->whereNumber('id');
+            Route::put('/account', 'updateAccount');
+            Route::put('/password', 'changePassword');
+            Route::post('/logout', 'logout');
+        });
+    });
+
+Route::middleware([LocalPrototypeOnly::class, 'web', 'auth:web', 'cms.json', 'cms.role:admin,editor'])
+    ->group(function (): void {
+    Route::middleware('cms.role:admin')->group(function (): void {
+        Route::get('/site-settings', [SiteSettingsController::class, 'index']);
+        Route::put('/site-settings', [SiteSettingsController::class, 'update']);
+        Route::get('/users', [CmsContentController::class, 'usersIndex']);
+        Route::get('/users/{id}', [CmsContentController::class, 'userShow'])->whereNumber('id');
+        Route::post('/users', [CmsContentController::class, 'userStore']);
+        Route::put('/users/{id}', [CmsContentController::class, 'userUpdate'])->whereNumber('id');
+        Route::delete('/users/{id}', [CmsContentController::class, 'userDestroy'])->whereNumber('id');
+        Route::get('/user-roles', [CmsContentController::class, 'userRolesIndex']);
+        Route::put('/user-roles', [CmsContentController::class, 'userRoleUpdate']);
+    });
+
     // Homepage Management
     Route::prefix('homepage')->controller(HomepageManagementController::class)->group(function (): void {
         Route::get('/', 'index');
@@ -89,14 +121,6 @@ Route::middleware(LocalPrototypeOnly::class)->group(function (): void {
     Route::post('/programs', [CmsContentController::class, 'programStore']);
     Route::put('/programs/{id}', [CmsContentController::class, 'programUpdate'])->whereNumber('id');
     Route::delete('/programs/{id}', [CmsContentController::class, 'programDestroy'])->whereNumber('id');
-
-    Route::get('/users', [CmsContentController::class, 'usersIndex']);
-    Route::get('/users/{id}', [CmsContentController::class, 'userShow'])->whereNumber('id');
-    Route::post('/users', [CmsContentController::class, 'userStore']);
-    Route::put('/users/{id}', [CmsContentController::class, 'userUpdate'])->whereNumber('id');
-    Route::delete('/users/{id}', [CmsContentController::class, 'userDestroy'])->whereNumber('id');
-    Route::get('/user-roles', [CmsContentController::class, 'userRolesIndex']);
-    Route::put('/user-roles', [CmsContentController::class, 'userRoleUpdate']);
 
     Route::get('/faculty', [CmsContentController::class, 'facultyIndex']);
     Route::get('/faculty/{id}', [CmsContentController::class, 'facultyShow'])->whereNumber('id');

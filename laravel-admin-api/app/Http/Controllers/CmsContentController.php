@@ -12,6 +12,11 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CmsContentController extends Controller
 {
+    private function escapeLike(string $value): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $value);
+    }
+
     public function health(): JsonResponse
     {
         DB::select('SELECT 1');
@@ -56,7 +61,7 @@ class CmsContentController extends Controller
             ]);
 
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('n.title', 'like', $term)
                     ->orWhere('n.author_name', 'like', $term)
@@ -88,7 +93,7 @@ class CmsContentController extends Controller
         }
         $this->applyDatePreset($query, 'n.published_at', $filters['date'] ?? null);
 
-        $rows = $query->orderByDesc('n.published_at')->orderByDesc('n.news_id')->get();
+        $rows = $query->orderByDesc('n.published_at')->orderByDesc('n.news_id')->limit(100)->get();
 
         return response()->json($rows->map(fn(object $row): array=> $this->newsJson($row)));
     }
@@ -133,35 +138,27 @@ class CmsContentController extends Controller
             ->leftJoin('campuses as c', 'c.campus_id', '=', 'a.campus_id')
             ->leftJoin('users as u', 'u.user_id', '=', 'a.created_by')
             ->leftJoin('documents as d', 'd.document_id', '=', 'a.attachment_document_id')
+            ->leftJoin('announcement_categories as ac', 'ac.category_id', '=', 'a.category_id')
             ->select([
                 'a.announcement_id as id', 'a.title', 'a.content', 'a.priority', 'a.expires_at',
                 'a.status', 'a.published_at', 'a.campus_id', 'c.name as campus_name',
                 'u.full_name as author_name', 'd.document_id', 'd.file_name', 'd.file_path',
                 'd.mime_type', 'd.file_size',
-                DB::raw('(SELECT ac.category_id FROM announcement_category_map acm JOIN announcement_categories ac ON ac.category_id = acm.category_id WHERE acm.announcement_id = a.announcement_id ORDER BY ac.category_id LIMIT 1) as category_id'),
-                DB::raw('(SELECT ac.name FROM announcement_category_map acm JOIN announcement_categories ac ON ac.category_id = acm.category_id WHERE acm.announcement_id = a.announcement_id ORDER BY ac.category_id LIMIT 1) as category_name'),
+                'a.category_id', 'ac.name as category_name',
             ]);
 
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('a.title', 'like', $term)
                     ->orWhere('a.content', 'like', $term)
                     ->orWhere('u.full_name', 'like', $term)
                     ->orWhere('c.name', 'like', $term)
-                    ->orWhereExists(function ($category) use ($term): void {
-                        $category->selectRaw('1')->from('announcement_category_map as acm')
-                            ->join('announcement_categories as ac', 'ac.category_id', '=', 'acm.category_id')
-                            ->whereColumn('acm.announcement_id', 'a.announcement_id')->where('ac.name', 'like', $term);
-                    });
+                    ->orWhere('ac.name', 'like', $term);
             });
         }
         if (! empty($filters['category'])) {
-            $query->whereExists(function ($category) use ($filters): void {
-                $category->selectRaw('1')->from('announcement_category_map')
-                    ->whereColumn('announcement_category_map.announcement_id', 'a.announcement_id')
-                    ->where('announcement_category_map.category_id', $filters['category']);
-            });
+            $query->where('a.category_id', $filters['category']);
         }
         if (! empty($filters['status'])) {
             if ($filters['status'] === 'expired') {
@@ -180,7 +177,7 @@ class CmsContentController extends Controller
         }
         $this->applyDatePreset($query, 'a.published_at', $filters['date'] ?? null);
 
-        $rows = $query->orderByDesc('a.published_at')->orderByDesc('a.announcement_id')->get();
+        $rows = $query->orderByDesc('a.published_at')->orderByDesc('a.announcement_id')->limit(100)->get();
 
         return response()->json($rows->map(fn(object $row): array=> $this->announcementJson($row)));
     }
@@ -229,7 +226,7 @@ class CmsContentController extends Controller
             ]);
 
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('e.title', 'like', $term)->orWhere('e.description', 'like', $term)
                     ->orWhere('e.venue', 'like', $term)->orWhere('e.organizer', 'like', $term)
@@ -251,7 +248,7 @@ class CmsContentController extends Controller
             }
         }
 
-        $rows   = $query->orderBy('e.start_at')->orderBy('e.event_id')->get();
+        $rows   = $query->orderBy('e.start_at')->orderBy('e.event_id')->limit(100)->get();
         $mapped = $rows->map(fn(object $row): array=> $this->eventJson($row));
         if (! empty($filters['status'])) {
             $mapped = $mapped->filter(fn(array $event): bool => $this->eventStatus($event) === $filters['status'])->values();
@@ -292,6 +289,7 @@ class CmsContentController extends Controller
 
     public function eventCategoryStore(Request $request): JsonResponse
     {
+        $this->trimUniqueFields($request, ['name']);
         $data = $request->validate([
             'name'        => ['required', 'string', 'max:100', 'unique:event_categories,name'],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -299,22 +297,23 @@ class CmsContentController extends Controller
         $id = DB::table('event_categories')->insertGetId([
             'name'        => trim($data['name']),
             'description' => $data['description'] ?? null,
-        ]);
+        ], 'category_id');
+        DB::table('event_categories')->where('category_id', $id)->update(['id' => $id]);
 
         return response()->json($this->eventCategoryJson($id), 201);
     }
 
     public function eventCategoryUpdate(Request $request, int $id): JsonResponse
     {
-        abort_unless(DB::table('event_categories')->where('id', $id)->exists(), 404);
+        abort_unless(DB::table('event_categories')->where('category_id', $id)->exists(), 404);
+        $this->trimUniqueFields($request, ['name']);
         $data = $request->validate([
-            'name'        => ['required', 'string', 'max:100', Rule::unique('event_categories', 'name')->ignore($id, 'id')],
+            'name'        => ['required', 'string', 'max:100', Rule::unique('event_categories', 'name')->ignore($id, 'category_id')],
             'description' => ['nullable', 'string', 'max:5000'],
         ]);
-        DB::table('event_categories')->where('id', $id)->update([
+        DB::table('event_categories')->where('category_id', $id)->update([
             'name'        => trim($data['name']),
             'description' => $data['description'] ?? null,
-            'updated_at'  => now(),
         ]);
 
         return response()->json($this->eventCategoryJson($id));
@@ -322,11 +321,11 @@ class CmsContentController extends Controller
 
     public function eventCategoryDestroy(int $id): JsonResponse
     {
-        abort_unless(DB::table('event_categories')->where('id', $id)->exists(), 404);
+        abort_unless(DB::table('event_categories')->where('category_id', $id)->exists(), 404);
         if (DB::table('events')->where('category_id', $id)->exists()) {
             return response()->json(['message' => 'Move or delete events that use this category first.'], 409);
         }
-        DB::table('event_categories')->where('id', $id)->delete();
+        DB::table('event_categories')->where('category_id', $id)->delete();
 
         return response()->json(['deleted' => true]);
     }
@@ -383,7 +382,7 @@ class CmsContentController extends Controller
             DB::raw('(SELECT COUNT(*) FROM announcements WHERE announcements.campus_id = campuses.campus_id) as announcementCount'),
         ]);
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('name', 'like', $term)->orWhere('code', 'like', $term)->orWhere('address', 'like', $term);
             });
@@ -392,7 +391,7 @@ class CmsContentController extends Controller
             $query->where('status', $filters['status']);
         }
 
-        return response()->json($query->orderBy('name')->orderBy('campus_id')->get());
+        return response()->json($query->orderBy('name')->orderBy('campus_id')->limit(100)->get());
     }
 
     public function campusStore(Request $request): JsonResponse
@@ -439,7 +438,7 @@ class CmsContentController extends Controller
                 DB::raw('(SELECT COUNT(*) FROM programs p WHERE p.college_id = c.college_id) as programCount'),
             ]);
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('c.name', 'like', $term)
                     ->orWhere('c.code', 'like', $term)
@@ -452,7 +451,7 @@ class CmsContentController extends Controller
             $query->where('c.status', $filters['status']);
         }
 
-        return response()->json($query->orderBy('c.name')->orderBy('c.college_id')->get()->map(
+        return response()->json($query->orderBy('c.name')->orderBy('c.college_id')->limit(100)->get()->map(
             fn (object $row): array => $this->collegeJson($row)
         ));
     }
@@ -514,7 +513,7 @@ class CmsContentController extends Controller
                 'p.description', 'p.status',
             ]);
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('p.name', 'like', $term)
                     ->orWhere('p.code', 'like', $term)
@@ -535,7 +534,7 @@ class CmsContentController extends Controller
             $query->where('p.status', $filters['status']);
         }
 
-        return response()->json($query->orderBy('p.name')->orderBy('p.program_id')->get());
+        return response()->json($query->orderBy('p.name')->orderBy('p.program_id')->limit(100)->get());
     }
 
     public function programShow(int $id): JsonResponse
@@ -574,7 +573,7 @@ class CmsContentController extends Controller
             'user_id as id', 'full_name as fullName', 'email', 'role', 'status',
         ]);
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('full_name', 'like', $term)
                     ->orWhere('email', 'like', $term)
@@ -588,7 +587,7 @@ class CmsContentController extends Controller
             $query->where('status', $filters['status']);
         }
 
-        return response()->json($query->orderBy('full_name')->orderBy('user_id')->get());
+        return response()->json($query->orderBy('full_name')->orderBy('user_id')->limit(100)->get());
     }
 
     public function userShow(int $id): JsonResponse
@@ -611,6 +610,14 @@ class CmsContentController extends Controller
     public function userDestroy(int $id): JsonResponse
     {
         $this->findUser($id);
+        if (request()->user()?->user_id === $id) {
+            return response()->json(['message' => 'You cannot delete the currently signed-in account.'], 422);
+        }
+        $activeAdmins = DB::table('users')->where('role', 'admin')->where('status', 'active')->count();
+        $target = DB::table('users')->where('user_id', $id)->first(['role', 'status']);
+        if ($target && $target->role === 'admin' && $target->status === 'active' && $activeAdmins <= 1) {
+            return response()->json(['message' => 'The final active administrator cannot be deleted.'], 422);
+        }
         DB::table('users')->where('user_id', $id)->delete();
 
         return response()->json(['deleted' => true]);
@@ -640,7 +647,9 @@ class CmsContentController extends Controller
         if (strcasecmp($oldName, $newName) !== 0 && DB::table('users')->where('role', $newName)->exists()) {
             return response()->json(['message' => 'A role with this name already exists.'], 422);
         }
-        DB::table('users')->where('role', $oldName)->update(['role' => $newName, 'updated_at' => now()]);
+        DB::transaction(function () use ($oldName, $newName): void {
+            DB::table('users')->where('role', $oldName)->update(['role' => $newName, 'updated_at' => now()]);
+        });
 
         return response()->json(['name' => $newName, 'userCount' => $existing]);
     }
@@ -654,13 +663,13 @@ class CmsContentController extends Controller
             DB::raw('(SELECT COUNT(*) FROM ' . $config['map'] . ' m WHERE m.' . $config['mapCategory'] . ' = c.' . $config['id'] . ') as contentCount'),
         ]);
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('c.name', 'like', $term)->orWhere('c.description', 'like', $term);
             });
         }
 
-        return $query->orderBy('c.name')->orderBy('c.' . $config['id'])->get();
+        return $query->orderBy('c.name')->orderBy('c.' . $config['id'])->limit(100)->get();
     }
 
     private function saveContentCategory(Request $request, string $kind, ?int $id = null): JsonResponse
@@ -668,6 +677,7 @@ class CmsContentController extends Controller
         $config = $this->contentCategoryConfig($kind);
         $existing = $id ? DB::table($config['table'])->where($config['id'], $id)->first() : null;
         abort_unless($id === null || $existing !== null, 404);
+        $this->trimUniqueFields($request, ['name']);
         $data = $request->validate([
             'name'        => ['required', 'string', 'max:100', 'regex:/\S/', Rule::unique($config['table'], 'name')->ignore($id, $config['id'])],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -718,7 +728,7 @@ class CmsContentController extends Controller
             ],
             'announcement' => [
                 'table' => 'announcement_categories', 'id' => 'category_id',
-                'map' => 'announcement_category_map', 'mapCategory' => 'category_id',
+                'map' => 'announcements', 'mapCategory' => 'category_id',
             ],
         ];
         abort_unless(isset($configs[$kind]), 404);
@@ -743,15 +753,20 @@ class CmsContentController extends Controller
 
     private function saveCampus(Request $request, ?int $id = null): JsonResponse
     {
+        $this->trimUniqueFields($request, ['name', 'code'], ['code']);
         $data = $request->validate([
             'name'    => ['required', 'string', 'max:150', 'regex:/\S/', Rule::unique('campuses', 'name')->ignore($id, 'campus_id')],
             'code'    => ['nullable', 'string', 'max:30', Rule::unique('campuses', 'code')->ignore($id, 'campus_id')],
             'address' => ['nullable', 'string', 'max:255'],
             'status'  => ['required', Rule::in(['active', 'inactive'])],
         ]);
+        $code = trim($data['code'] ?? '');
+        if ($code === '') {
+            $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', trim($data['name'])), 0, 8)) ?: 'CAMPUS';
+        }
         $values = [
             'name' => trim($data['name']),
-            'code' => trim($data['code'] ?? '') ?: null,
+            'code' => $code,
             'address' => trim($data['address'] ?? '') ?: null,
             'status' => $data['status'],
             'updated_at' => now(),
@@ -764,6 +779,8 @@ class CmsContentController extends Controller
         }
         $campus = DB::table('campuses')->select([
             'campus_id as id', 'name', 'code', 'address', 'status',
+            DB::raw('(SELECT COUNT(*) FROM news WHERE news.campus_id = campuses.campus_id) as newsCount'),
+            DB::raw('(SELECT COUNT(*) FROM announcements WHERE announcements.campus_id = campuses.campus_id) as announcementCount'),
         ])->where('campus_id', $id)->first();
 
         return response()->json($campus, $request->isMethod('post') ? 201 : 200);
@@ -778,20 +795,21 @@ class CmsContentController extends Controller
         ]);
         $query = DB::table('departments as d')
             ->join('colleges as c', 'c.college_id', '=', 'd.college_id')
-            ->leftJoin('faculty as f', 'f.faculty_id', '=', 'd.head_faculty_id')
+            ->leftJoin('faculty_staff as f', 'f.faculty_id', '=', 'd.head_faculty_id')
             ->select([
                 'd.department_id as id', 'd.name', 'd.slug', 'd.code',
                 'd.college_id as collegeId', 'c.name as collegeName', 'c.code as collegeCode',
-                'd.head_faculty_id as headId', 'f.name as headName',
+                'd.head_faculty_id as headId',
+                DB::raw("TRIM(CONCAT(COALESCE(f.first_name, ''), ' ', COALESCE(f.middle_name, ''), ' ', COALESCE(f.last_name, ''))) as headName"),
                 'd.description', 'd.status',
                 DB::raw('(SELECT COUNT(*) FROM programs p WHERE p.department_id = d.department_id) as programCount'),
             ]);
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('d.name', 'like', $term)
                     ->orWhere('d.code', 'like', $term)
-                    ->orWhere('f.name', 'like', $term)
+                    ->orWhereRaw("CONCAT(COALESCE(f.first_name, ''), ' ', COALESCE(f.middle_name, ''), ' ', COALESCE(f.last_name, '')) like ?", [$term])
                     ->orWhere('c.name', 'like', $term)
                     ->orWhere('c.code', 'like', $term)
                     ->orWhere('d.description', 'like', $term);
@@ -804,7 +822,7 @@ class CmsContentController extends Controller
             $query->where('d.status', $filters['status']);
         }
 
-        return response()->json($query->orderBy('c.name')->orderBy('d.name')->orderBy('d.department_id')->get());
+        return response()->json($query->orderBy('c.name')->orderBy('d.name')->orderBy('d.department_id')->limit(100)->get());
     }
 
     public function departmentShow(int $id): JsonResponse
@@ -814,15 +832,15 @@ class CmsContentController extends Controller
             ->where('department_id', $id)
             ->orderBy('name')
             ->get(['name', 'code']);
-        $department->staff = DB::table('faculty')
+        $department->staff = DB::table('faculty_staff')
             ->where(function ($query) use ($id, $department): void {
                 $query->where('department_id', $id);
                 if ($department->headId) {
                     $query->orWhere('faculty_id', $department->headId);
                 }
             })
-            ->orderBy('name')
-            ->get(['name', 'position']);
+            ->orderBy('last_name')
+            ->get([DB::raw("TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(middle_name, ''), ' ', COALESCE(last_name, ''))) as name"), 'position']);
 
         return response()->json($department);
     }
@@ -856,20 +874,22 @@ class CmsContentController extends Controller
             'q'          => ['nullable', 'string', 'max:200'],
             'department' => ['nullable', 'integer', 'exists:departments,department_id'],
         ]);
-        $query = DB::table('faculty as f')
+        $query = DB::table('faculty_staff as f')
             ->leftJoin('departments as d', 'd.department_id', '=', 'f.department_id')
             ->select([
-                'f.faculty_id as id', 'f.name', 'f.position', 'f.department_id as departmentId',
-                'd.name as department', 'f.email', 'f.summary',
+                'f.faculty_id as id',
+                DB::raw("TRIM(CONCAT(COALESCE(f.first_name, ''), ' ', COALESCE(f.middle_name, ''), ' ', COALESCE(f.last_name, ''))) as name"),
+                'f.position', 'f.department_id as departmentId',
+                'd.name as department', 'f.email', 'f.biography as summary',
             ]);
 
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
-                $q->where('f.name', 'like', $term)
+                $q->whereRaw("CONCAT(COALESCE(f.first_name, ''), ' ', COALESCE(f.middle_name, ''), ' ', COALESCE(f.last_name, '')) like ?", [$term])
                     ->orWhere('f.position', 'like', $term)
                     ->orWhere('f.email', 'like', $term)
-                    ->orWhere('f.summary', 'like', $term)
+                    ->orWhere('f.biography', 'like', $term)
                     ->orWhere('d.name', 'like', $term);
             });
         }
@@ -877,7 +897,7 @@ class CmsContentController extends Controller
             $query->where('f.department_id', $filters['department']);
         }
 
-        return response()->json($query->orderBy('f.name')->orderBy('f.faculty_id')->get());
+        return response()->json($query->orderBy('f.last_name')->orderBy('f.faculty_id')->limit(100)->get());
     }
 
     public function facultyShow(int $id): JsonResponse
@@ -903,7 +923,7 @@ class CmsContentController extends Controller
         if (DB::table('departments')->where('head_faculty_id', $id)->exists()) {
             return response()->json(['message' => 'Remove this person as a department head before deleting the record.'], 409);
         }
-        DB::table('faculty')->where('faculty_id', $id)->delete();
+        DB::table('faculty_staff')->where('faculty_id', $id)->delete();
 
         return response()->json(['deleted' => true]);
     }
@@ -916,12 +936,12 @@ class CmsContentController extends Controller
             'file_size as fileSize', 'alt_text as altText', 'file_path as filePath', 'created_at as createdAt',
         ]);
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('file_name', 'like', $term)->orWhere('alt_text', 'like', $term);
             });
         }
-        $rows = $query->orderByDesc('media_id')->get();
+        $rows = $query->orderByDesc('media_id')->limit(100)->get();
 
         return response()->json($rows->map(fn (object $row): array => [
             'id'        => (int) $row->id,
@@ -941,9 +961,13 @@ class CmsContentController extends Controller
             'data'    => ['required', 'string', 'max:7500000'],
             'altText' => ['nullable', 'string', 'max:255'],
         ]);
-        $id = $this->storeImage($data['data']);
-        abort_unless($id !== null, 422, 'Select an image file to upload.');
-        DB::table('media')->where('media_id', $id)->update(['alt_text' => trim($data['altText'] ?? '') ?: null]);
+        $id = $this->transactionWithUploadCleanup(function (array &$createdFiles) use ($data): int {
+            $id = $this->storeImage($data['data'], $createdFiles);
+            abort_unless($id !== null, 422, 'Select an image file to upload.');
+            DB::table('media')->where('media_id', $id)->update(['alt_text' => trim($data['altText'] ?? '') ?: null]);
+
+            return $id;
+        });
 
         return response()->json($this->mediaJson($id), 201);
     }
@@ -986,12 +1010,12 @@ class CmsContentController extends Controller
             'file_size as fileSize', 'file_path as filePath', 'created_at as createdAt',
         ]);
         if (! empty($filters['q'])) {
-            $term = '%' . $filters['q'] . '%';
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('title', 'like', $term)->orWhere('file_name', 'like', $term);
             });
         }
-        $rows = $query->orderByDesc('document_id')->get();
+        $rows = $query->orderByDesc('document_id')->limit(100)->get();
 
         return response()->json($rows->map(fn (object $row): array => [
             'id'        => (int) $row->id,
@@ -1012,10 +1036,14 @@ class CmsContentController extends Controller
             'fileName' => ['required', 'string', 'max:255'],
             'data'     => ['required', 'string', 'max:600000'],
         ]);
-        $id = $this->storeDocument(['name' => $data['fileName'], 'data' => $data['data']]);
-        if (! empty($data['title'])) {
-            DB::table('documents')->where('document_id', $id)->update(['title' => trim($data['title'])]);
-        }
+        $id = $this->transactionWithUploadCleanup(function (array &$createdFiles) use ($data): int {
+            $id = $this->storeDocument(['name' => $data['fileName'], 'data' => $data['data']], $createdFiles);
+            if (! empty($data['title'])) {
+                DB::table('documents')->where('document_id', $id)->update(['title' => trim($data['title'])]);
+            }
+
+            return $id;
+        });
 
         return response()->json($this->documentJson($id), 201);
     }
@@ -1050,8 +1078,9 @@ class CmsContentController extends Controller
     {
         $media = DB::table('media')->where('media_id', $id)->first();
         abort_unless($media !== null, 404);
+        $inline = in_array((string) $media->mime_type, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true);
 
-        return $this->storedFileResponse((string) $media->file_path, $media->mime_type, $media->file_name, false);
+        return $this->storedFileResponse((string) $media->file_path, $media->mime_type, $media->file_name, ! $inline);
     }
 
     public function documentShow(int $id): Response
@@ -1076,15 +1105,15 @@ class CmsContentController extends Controller
             'image'            => ['nullable', 'string', 'max:7500000'],
         ]);
 
-        $record = DB::transaction(function () use ($data, $id): int {
+        $record = $this->transactionWithUploadCleanup(function (array &$createdFiles) use ($data, $id): int {
             $existing   = $id ? DB::table('news')->where('news_id', $id)->first() : null;
-            $imageId    = $this->storeImage($data['image'] ?? null);
+            $imageId    = $this->storeImage($data['image'] ?? null, $createdFiles);
             $imageValue = $data['image'] ?? null;
             $values     = [
                 'title'          => trim($data['title']),
                 'author_name'    => $data['author'] ?? null,
                 'summary'        => $data['shortDescription'] ?? null,
-                'content'        => $data['content'] ?? '',
+                'content'        => $this->sanitizeRichText($data['content'] ?? ''),
                 'status'         => $data['status'],
                 'published_at'   => ($data['publishedAt'] ?? null) ?: ($data['status'] === 'published' ? now() : null),
                 'campus_id'      => $data['campusId'] ?? null,
@@ -1094,6 +1123,7 @@ class CmsContentController extends Controller
                 'updated_at'     => now(),
             ];
             if (! $existing) {
+                $values['created_by'] = request()->user()?->user_id;
                 $values['slug']       = $this->uniqueSlug('news', 'slug', $data['title']);
                 $values['created_at'] = now();
                 $recordId             = DB::table('news')->insertGetId($values, 'news_id');
@@ -1133,19 +1163,23 @@ class CmsContentController extends Controller
             'attachment.id'   => ['nullable', 'integer', 'exists:documents,document_id'],
             'attachment.url'  => ['nullable', 'url', 'max:2000'],
         ]);
-        $record = DB::transaction(function () use ($data, $id): int {
+        $record = $this->transactionWithUploadCleanup(function (array &$createdFiles) use ($data, $id): int {
             $existing   = $id ? DB::table('announcements')->where('announcement_id', $id)->first() : null;
             $attachment = $data['attachment'] ?? null;
             $documentId = $attachment && ! empty($attachment['data'])
-                ? $this->storeDocument($attachment)
+                ? $this->storeDocument($attachment, $createdFiles)
                 : (($attachment && $existing && (int) ($attachment['id'] ?? 0) === (int) $existing->attachment_document_id)
                     ? $existing->attachment_document_id
                     : null);
             $values = [
                 'title'                  => trim($data['title']),
-                'content'                => $data['content'] ?? '',
+                'author_name'            => request()->user()?->full_name,
+                'category_id'            => $data['categoryId'],
+                'content'                => $this->sanitizeRichText($data['content'] ?? ''),
                 'priority'               => $data['priority'],
-                'expires_at'             => $data['expiresAt'] ?? null,
+                'expires_at'             => isset($data['expiresAt'])
+                    ? Carbon::parse($data['expiresAt'])->endOfDay()->format('Y-m-d H:i:s')
+                    : null,
                 'status'                 => $data['status'],
                 'published_at'           => ($data['publishedAt'] ?? null) ?: ($data['status'] === 'published' ? now() : null),
                 'campus_id'              => $data['campusId'] ?? null,
@@ -1153,17 +1187,14 @@ class CmsContentController extends Controller
                 'updated_at'             => now(),
             ];
             if (! $existing) {
+                $values['created_by'] = request()->user()?->user_id;
                 $values['created_at'] = now();
                 $recordId             = DB::table('announcements')->insertGetId($values, 'announcement_id');
             } else {
                 DB::table('announcements')->where('announcement_id', $id)->update($values);
                 $recordId = $id;
             }
-            DB::table('announcement_category_map')->where('announcement_id', $recordId)->delete();
-            DB::table('announcement_category_map')->insert([
-                'announcement_id' => $recordId,
-                'category_id'     => $data['categoryId'],
-            ]);
+            DB::table('announcements')->where('announcement_id', $recordId)->update(['category_id' => $data['categoryId']]);
 
             return $recordId;
         });
@@ -1173,17 +1204,29 @@ class CmsContentController extends Controller
 
     private function saveUser(Request $request, ?int $id = null): JsonResponse
     {
+        $this->trimUniqueFields($request, ['email']);
         $data = $request->validate([
             'fullName' => ['required', 'string', 'max:150', 'regex:/\S/'],
             'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($id, 'user_id')],
-            'role'     => ['required', 'string', 'max:50', 'regex:/\S/'],
+            'role'     => ['required', Rule::in(['admin', 'editor'])],
             'status'   => ['required', Rule::in(['active', 'inactive'])],
             'password' => $id === null
-                ? ['required', 'string', 'min:8', 'max:72']
-                : ['nullable', 'string', 'min:8', 'max:72'],
+                ? ['required', 'string', 'min:12', 'max:1024']
+                : ['nullable', 'string', 'min:12', 'max:1024'],
         ]);
+        $fullName = trim($data['fullName']);
+        $nameParts = preg_split('/\s+/', $fullName, 2) ?: [$fullName];
+        $roleName = $data['role'] === 'admin' ? 'Administrator' : 'Editor';
+        $roleId = DB::table('roles')->where('name', $roleName)->value('role_id');
+        abort_unless($roleId, 422, 'The selected role is unavailable.');
+        $campusId = DB::table('campuses')->orderBy('campus_id')->value('campus_id');
+        abort_unless($campusId, 422, 'A campus is required for users.');
         $values = [
-            'full_name'  => trim($data['fullName']),
+            'full_name'  => $fullName,
+            'first_name' => $nameParts[0],
+            'last_name'  => $nameParts[1] ?? '',
+            'campus_id'  => $campusId,
+            'role_id'    => $roleId,
             'email'      => trim($data['email']),
             'role'       => trim($data['role']),
             'status'     => $data['status'],
@@ -1194,6 +1237,12 @@ class CmsContentController extends Controller
         }
         if ($id === null) {
             $values['created_at'] = now();
+            $values['username'] = strtolower(preg_replace('/[^a-z0-9]+/i', '.', $fullName) ?: 'user' . time());
+            $baseUsername = $values['username'];
+            $suffix = 2;
+            while (DB::table('users')->where('username', $values['username'])->exists()) {
+                $values['username'] = $baseUsername . $suffix++;
+            }
             $userId = DB::table('users')->insertGetId($values, 'user_id');
         } else {
             DB::table('users')->where('user_id', $id)->update($values);
@@ -1205,6 +1254,8 @@ class CmsContentController extends Controller
 
     private function saveCollege(Request $request, ?int $id = null): JsonResponse
     {
+        $this->trimUniqueFields($request, ['name', 'code']);
+        $request->merge(['code' => strtoupper((string) $request->input('code'))]);
         $data = $request->validate([
             'name'        => ['required', 'string', 'max:200', 'regex:/\S/'],
             'code'        => ['required', 'string', 'max:30', 'regex:/^[A-Za-z0-9-]+$/', Rule::unique('colleges', 'code')->ignore($id, 'college_id')],
@@ -1217,16 +1268,17 @@ class CmsContentController extends Controller
         $data['name'] = trim($data['name']);
         $data['code'] = strtoupper(trim($data['code']));
 
-        $collegeId = DB::transaction(function () use ($data, $id): int {
+        $collegeId = $this->transactionWithUploadCleanup(function (array &$createdFiles) use ($data, $id): int {
             $existing = $id ? DB::table('colleges')->where('college_id', $id)->first() : null;
             $imageValue = $data['image'] ?? null;
             $imageId = is_string($imageValue) && str_starts_with($imageValue, 'data:')
-                ? $this->storeImage($imageValue)
+                ? $this->storeImage($imageValue, $createdFiles)
                 : ($imageValue === '' ? null : ($existing->logo_media_id ?? null));
             $values = [
                 'name'          => $data['name'],
                 'code'          => $data['code'],
-                'description'   => $data['description'] ?? null,
+                'campus_id'     => DB::table('campuses')->orderBy('campus_id')->value('campus_id'),
+                'description'   => $this->sanitizeRichText($data['description'] ?? ''),
                 'dean_name'     => isset($data['deanName']) ? trim($data['deanName']) : null,
                 'email'         => isset($data['contactEmail']) ? trim($data['contactEmail']) : null,
                 'logo_media_id' => $imageId,
@@ -1234,6 +1286,7 @@ class CmsContentController extends Controller
                 'updated_at'    => now(),
             ];
             if ($id === null) {
+                $values['created_by'] = request()->user()?->user_id;
                 $values['slug'] = $this->uniqueSlug('colleges', 'slug', $data['name']);
                 $values['created_at'] = now();
 
@@ -1250,6 +1303,7 @@ class CmsContentController extends Controller
 
     private function saveProgram(Request $request, ?int $id = null): JsonResponse
     {
+        $this->trimUniqueFields($request, ['name', 'code']);
         $data = $request->validate([
             'name'         => ['required', 'string', 'max:200', 'regex:/\S/'],
             'code'         => ['required', 'string', 'max:30', 'regex:/^[A-Za-z0-9 .-]+$/', Rule::unique('programs', 'code')->ignore($id, 'program_id')],
@@ -1274,7 +1328,7 @@ class CmsContentController extends Controller
                 'degree_level'  => trim($data['degreeLevel']),
                 'college_id'    => $data['collegeId'],
                 'department_id' => $data['departmentId'],
-                'description'   => $data['description'] ?? null,
+                'description'   => $this->sanitizeRichText($data['description'] ?? ''),
                 'status'        => $data['status'],
                 'updated_at'    => now(),
             ];
@@ -1294,26 +1348,41 @@ class CmsContentController extends Controller
 
     private function saveFaculty(Request $request, ?int $id = null): JsonResponse
     {
+        $this->trimUniqueFields($request, ['email'], ['email']);
+        $request->merge([
+            'name' => trim((string) $request->input('name')),
+            'position' => trim((string) $request->input('position')),
+            'summary' => trim((string) $request->input('summary')),
+        ]);
         $data = $request->validate([
             'name'         => ['required', 'string', 'max:150'],
             'position'     => ['nullable', 'string', 'max:150'],
             'departmentId' => ['nullable', 'integer', 'exists:departments,department_id'],
-            'email'        => ['nullable', 'email', 'max:255'],
+            'email'        => ['nullable', 'email', 'max:255', Rule::unique('faculty_staff', 'email')->ignore($id, 'faculty_id')],
             'summary'      => ['nullable', 'string', 'max:5000'],
         ]);
+        $nameParts = preg_split('/\s+/', trim($data['name']), 3) ?: [trim($data['name'])];
+        $firstName = $nameParts[0] ?? '';
+        $middleName = count($nameParts) === 3 ? ($nameParts[1] ?? null) : null;
+        $lastName = count($nameParts) >= 2 ? end($nameParts) : '';
         $values = [
-            'name'          => trim($data['name']),
+            'first_name'    => $firstName,
+            'middle_name'   => $middleName,
+            'last_name'     => $lastName,
             'position'      => isset($data['position']) ? trim($data['position']) : null,
             'department_id' => $data['departmentId'] ?? null,
             'email'         => isset($data['email']) ? trim($data['email']) : null,
-            'summary'       => isset($data['summary']) ? trim($data['summary']) : null,
+            'biography'     => isset($data['summary']) ? trim($data['summary']) : null,
             'updated_at'    => now(),
         ];
         if ($id === null) {
             $values['created_at'] = now();
-            $facultyId = DB::table('faculty')->insertGetId($values, 'faculty_id');
+            $values['campus_id'] = DB::table('departments')->where('department_id', $data['departmentId'] ?? 0)->value('campus_id')
+                ?? DB::table('campuses')->orderBy('campus_id')->value('campus_id');
+            abort_unless($values['campus_id'], 422, 'A campus is required for faculty records.');
+            $facultyId = DB::table('faculty_staff')->insertGetId($values, 'faculty_id');
         } else {
-            DB::table('faculty')->where('faculty_id', $id)->update($values);
+            DB::table('faculty_staff')->where('faculty_id', $id)->update($values);
             $facultyId = $id;
         }
 
@@ -1322,11 +1391,13 @@ class CmsContentController extends Controller
 
     private function saveDepartment(Request $request, ?int $id = null): JsonResponse
     {
+        $this->trimUniqueFields($request, ['name', 'code']);
+        $request->merge(['code' => strtoupper((string) $request->input('code'))]);
         $data = $request->validate([
             'name'          => ['required', 'string', 'max:200', 'regex:/\S/'],
             'code'          => ['required', 'string', 'max:30', 'regex:/^[A-Za-z0-9-]+$/', Rule::unique('departments', 'code')->ignore($id, 'department_id')],
             'collegeId'     => ['required', 'integer', 'exists:colleges,college_id'],
-            'headFacultyId' => ['nullable', 'integer', 'exists:faculty,faculty_id'],
+            'headFacultyId' => ['nullable', 'integer', 'exists:faculty_staff,faculty_id'],
             'description'   => ['nullable', 'string', 'max:20000'],
             'status'        => ['required', Rule::in(['active', 'inactive'])],
         ]);
@@ -1334,16 +1405,21 @@ class CmsContentController extends Controller
         $data['code'] = strtoupper(trim($data['code']));
 
         $departmentId = DB::transaction(function () use ($data, $id): int {
+            $campusId = DB::table('colleges')->where('college_id', $data['collegeId'])->value('campus_id')
+                ?? DB::table('campuses')->orderBy('campus_id')->value('campus_id');
+            abort_unless($campusId, 422, 'A campus is required for departments.');
             $values = [
                 'name'           => $data['name'],
                 'code'           => $data['code'],
                 'college_id'     => $data['collegeId'],
+                'campus_id'      => $campusId,
                 'head_faculty_id' => $data['headFacultyId'] ?? null,
-                'description'    => $data['description'] ?? null,
+                'description'    => $this->sanitizeRichText($data['description'] ?? ''),
                 'status'         => $data['status'],
                 'updated_at'     => now(),
             ];
             if ($id === null) {
+                $values['created_by'] = request()->user()?->user_id;
                 $values['slug']       = $this->uniqueSlug('departments', 'slug', $data['name']);
                 $values['created_at'] = now();
 
@@ -1382,32 +1458,42 @@ class CmsContentController extends Controller
         ]);
         $startAt     = Carbon::parse($data['startDate'] . ' ' . ($data['startTime'] ?? '00:00'))->format('Y-m-d H:i:s');
         $endAt       = Carbon::parse(($data['endDate'] ?? $data['startDate']) . ' ' . ($data['endTime'] ?? '23:59'))->format('Y-m-d H:i:s');
-        $existing    = $id ? DB::table('events')->where('event_id', $id)->first() : null;
-        $bannerId    = $this->storeImage($data['banner'] ?? null);
-        $bannerValue = $data['banner'] ?? null;
-        $values      = [
-            'title'          => trim($data['title']),
-            'description'    => $data['description'] ?? null,
-            'category_id'    => $data['categoryId'],
-            'venue'          => $data['venue'] ?? null,
-            'start_at'       => $startAt,
-            'end_at'         => $endAt,
-            'organizer'      => $data['organizer'] ?? null,
-            'status'         => $data['state'],
-            'cover_media_id' => str_starts_with((string) $bannerValue, 'data:')
-                ? $bannerId
-                : ($bannerValue === '' ? null : ($existing->cover_media_id ?? null)),
-            'updated_at'     => now(),
-        ];
-        if (! $id) {
-            $values['slug']       = $this->uniqueSlug('events', 'slug', $data['title']);
-            $values['created_at'] = now();
-            $id                   = DB::table('events')->insertGetId($values, 'event_id');
-        } else {
-            DB::table('events')->where('event_id', $id)->update($values);
+        if ($data['startTime'] && $data['endTime'] && ($data['startDate'] === ($data['endDate'] ?? $data['startDate'])) && $endAt <= $startAt) {
+            abort(422, 'The end time must be after the start time.');
         }
+        $eventId = $this->transactionWithUploadCleanup(function (array &$createdFiles) use ($data, $id, $startAt, $endAt): int {
+            $existing    = $id ? DB::table('events')->where('event_id', $id)->first() : null;
+            $bannerId    = $this->storeImage($data['banner'] ?? null, $createdFiles);
+            $bannerValue = $data['banner'] ?? null;
+            $values      = [
+                'title'          => trim($data['title']),
+                'campus_id'      => DB::table('campuses')->orderBy('campus_id')->value('campus_id'),
+                'description'    => $this->sanitizeRichText($data['description'] ?? ''),
+                'category_id'    => $data['categoryId'],
+                'venue'          => $data['venue'] ?? null,
+                'start_at'       => $startAt,
+                'end_at'         => $endAt,
+                'organizer'      => $data['organizer'] ?? null,
+                'status'         => $data['state'],
+                'cover_media_id' => str_starts_with((string) $bannerValue, 'data:')
+                    ? $bannerId
+                    : ($bannerValue === '' ? null : ($existing->cover_media_id ?? null)),
+                'updated_at'     => now(),
+            ];
+            if (! $id) {
+                $values['created_by'] = request()->user()?->user_id;
+                $values['slug']       = $this->uniqueSlug('events', 'slug', $data['title']);
+                $values['created_at'] = now();
 
-        return response()->json($this->eventJson($this->findEvent($id)), $request->isMethod('post') ? 201 : 200);
+                return DB::table('events')->insertGetId($values, 'event_id');
+            }
+
+            DB::table('events')->where('event_id', $id)->update($values);
+
+            return $id;
+        });
+
+        return response()->json($this->eventJson($this->findEvent($eventId)), $request->isMethod('post') ? 201 : 200);
     }
 
     private function applyDatePreset($query, string $column, ?string $preset): void
@@ -1519,12 +1605,12 @@ class CmsContentController extends Controller
 
     private function eventCategories()
     {
-        return DB::table('event_categories')->orderBy('name')->get(['id', 'name', 'description']);
+        return DB::table('event_categories')->orderBy('name')->get(['category_id as id', 'name', 'description']);
     }
 
     private function eventCategoryJson(int $id): object
     {
-        return DB::table('event_categories')->where('id', $id)->first(['id', 'name', 'description']);
+        return DB::table('event_categories')->where('category_id', $id)->first(['category_id as id', 'name', 'description']);
     }
 
     private function findNews(int $id): object
@@ -1580,6 +1666,13 @@ class CmsContentController extends Controller
 
     private function deleteStoredUpload(string $path): void
     {
+        if (str_starts_with($path, 'private/')) {
+            $diskPath = substr($path, strlen('private/'));
+            if (Storage::disk('local')->exists($diskPath)) {
+                abort_unless(Storage::disk('local')->delete($diskPath), 500, 'The uploaded file could not be removed.');
+            }
+            return;
+        }
         if (! str_starts_with($path, '/storage/')) {
             return;
         }
@@ -1591,11 +1684,13 @@ class CmsContentController extends Controller
 
     private function findFaculty(int $id): object
     {
-        $row = DB::table('faculty as f')
+        $row = DB::table('faculty_staff as f')
             ->leftJoin('departments as d', 'd.department_id', '=', 'f.department_id')
             ->select([
-                'f.faculty_id as id', 'f.name', 'f.position', 'f.department_id as departmentId',
-                'd.name as department', 'f.email', 'f.summary',
+                'f.faculty_id as id',
+                DB::raw("TRIM(CONCAT(COALESCE(f.first_name, ''), ' ', COALESCE(f.middle_name, ''), ' ', COALESCE(f.last_name, ''))) as name"),
+                'f.position', 'f.department_id as departmentId',
+                'd.name as department', 'f.email', 'f.biography as summary',
             ])
             ->where('f.faculty_id', $id)
             ->first();
@@ -1671,11 +1766,12 @@ class CmsContentController extends Controller
     {
         $row = DB::table('departments as d')
             ->join('colleges as c', 'c.college_id', '=', 'd.college_id')
-            ->leftJoin('faculty as f', 'f.faculty_id', '=', 'd.head_faculty_id')
+            ->leftJoin('faculty_staff as f', 'f.faculty_id', '=', 'd.head_faculty_id')
             ->select([
                 'd.department_id as id', 'd.name', 'd.slug', 'd.code',
                 'd.college_id as collegeId', 'c.name as collegeName', 'c.code as collegeCode',
-                'd.head_faculty_id as headId', 'f.name as headName',
+                'd.head_faculty_id as headId',
+                DB::raw("TRIM(CONCAT(COALESCE(f.first_name, ''), ' ', COALESCE(f.middle_name, ''), ' ', COALESCE(f.last_name, ''))) as headName"),
                 'd.description', 'd.status',
                 DB::raw('(SELECT COUNT(*) FROM programs p WHERE p.department_id = d.department_id) as programCount'),
             ])
@@ -1692,12 +1788,12 @@ class CmsContentController extends Controller
             ->leftJoin('campuses as c', 'c.campus_id', '=', 'a.campus_id')
             ->leftJoin('users as u', 'u.user_id', '=', 'a.created_by')
             ->leftJoin('documents as d', 'd.document_id', '=', 'a.attachment_document_id')
+            ->leftJoin('announcement_categories as ac', 'ac.category_id', '=', 'a.category_id')
             ->select([
                 'a.announcement_id as id', 'a.title', 'a.content', 'a.priority', 'a.expires_at',
                 'a.status', 'a.published_at', 'a.campus_id', 'c.name as campus_name', 'u.full_name as author_name',
                 'd.document_id', 'd.file_name', 'd.file_path', 'd.mime_type', 'd.file_size',
-                DB::raw('(SELECT ac.category_id FROM announcement_category_map acm JOIN announcement_categories ac ON ac.category_id = acm.category_id WHERE acm.announcement_id = a.announcement_id ORDER BY ac.category_id LIMIT 1) as category_id'),
-                DB::raw('(SELECT ac.name FROM announcement_category_map acm JOIN announcement_categories ac ON ac.category_id = acm.category_id WHERE acm.announcement_id = a.announcement_id ORDER BY ac.category_id LIMIT 1) as category_name'),
+                'a.category_id', 'ac.name as category_name',
             ])->where('a.announcement_id', $id)->first();
         abort_unless($row !== null, 404);
 
@@ -1717,7 +1813,44 @@ class CmsContentController extends Controller
         return $row;
     }
 
-    private function storeImage(?string $dataUrl): ?int
+    private function trimUniqueFields(Request $request, array $fields, array $nullableFields = []): void
+    {
+        $normalized = [];
+        foreach ($fields as $field) {
+            $value = $request->input($field);
+            if (! is_string($value)) {
+                continue;
+            }
+            $value = trim($value);
+            $normalized[$field] = $value === '' && in_array($field, $nullableFields, true) ? null : $value;
+        }
+        $request->merge($normalized);
+    }
+
+    private function transactionWithUploadCleanup(callable $callback): mixed
+    {
+        $createdFiles = [];
+        try {
+            return DB::transaction(function () use ($callback, &$createdFiles) {
+                return $callback($createdFiles);
+            });
+        } catch (\Throwable $exception) {
+            foreach ($createdFiles as $file) {
+                try {
+                    $deleted = Storage::disk($file['disk'])->delete($file['path']);
+                } catch (\Throwable $cleanupException) {
+                    throw new \RuntimeException('A failed upload could not be cleaned up.', 0, $cleanupException);
+                }
+                if (! $deleted) {
+                    throw new \RuntimeException('A failed upload could not be cleaned up.', 0, $exception);
+                }
+            }
+
+            throw $exception;
+        }
+    }
+
+    private function storeImage(?string $dataUrl, ?array &$createdFiles = null): ?int
     {
         if (! $dataUrl || ! str_starts_with($dataUrl, 'data:')) {
             return null;
@@ -1729,21 +1862,66 @@ class CmsContentController extends Controller
         abort_unless($bytes !== false && strlen($bytes) <= 5 * 1024 * 1024, 422, 'The image is invalid or exceeds 5 MB.');
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
         abort_unless(in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true), 422, 'The image type is not allowed.');
+        $imageInfo = @getimagesizefromstring($bytes);
+        abort_unless($imageInfo !== false && $imageInfo[0] > 0 && $imageInfo[1] > 0
+            && $imageInfo[0] * $imageInfo[1] <= 20000000, 422, 'The image dimensions are invalid or too large.');
+        $encoder = [
+            'image/jpeg' => 'imagejpeg',
+            'image/png' => 'imagepng',
+            'image/gif' => 'imagegif',
+            'image/webp' => 'imagewebp',
+        ][$mime];
+        abort_unless(function_exists('imagecreatefromstring') && function_exists('imagecreatetruecolor')
+            && function_exists('imagecopyresampled') && function_exists($encoder),
+            503, 'Image processing support is unavailable on this server.');
+        $source = @imagecreatefromstring($bytes);
+        abort_unless($source !== false, 422, 'The image cannot be decoded.');
+        $width = imagesx($source);
+        $height = imagesy($source);
+        $scale = min(1, 1200 / max($width, $height));
+        $newWidth = max(1, (int) round($width * $scale));
+        $newHeight = max(1, (int) round($height * $scale));
+        $canvas = imagecreatetruecolor($newWidth, $newHeight);
+        abort_unless($canvas !== false, 503, 'Image processing support is unavailable on this server.');
+        imagealphablending($canvas, false);
+        imagesavealpha($canvas, true);
+        imagecopyresampled($canvas, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+        ob_start();
+        if ($mime === 'image/jpeg') {
+            $encodedSuccessfully = imagejpeg($canvas, null, 82);
+        } elseif ($mime === 'image/png') {
+            $encodedSuccessfully = imagepng($canvas);
+        } elseif ($mime === 'image/gif') {
+            $encodedSuccessfully = imagegif($canvas);
+        } else {
+            $encodedSuccessfully = imagewebp($canvas, null, 82);
+        }
+        $encodedBytes = ob_get_clean();
+        imagedestroy($canvas);
+        imagedestroy($source);
+        abort_unless($encodedSuccessfully && is_string($encodedBytes) && $encodedBytes !== '', 422, 'The image could not be re-encoded.');
+        $bytes = $encodedBytes;
 
         $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'][$mime];
         $path      = 'media/' . Str::uuid() . '.' . $extension;
-        Storage::disk('public')->put($path, $bytes);
+        abort_unless(Storage::disk('public')->put($path, $bytes), 500, 'The uploaded image could not be stored.');
+        if ($createdFiles !== null) {
+            $createdFiles[] = ['disk' => 'public', 'path' => $path];
+        }
         $id = DB::table('media')->insertGetId([
             'file_name' => basename($path),
             'file_path' => '/storage/' . $path,
+            'file_type' => $mime,
+            'file_size_kb' => (int) ceil(strlen($bytes) / 1024),
             'mime_type' => $mime,
             'file_size' => strlen($bytes),
+            'uploaded_by' => request()->user()?->user_id,
         ], 'media_id');
 
         return $id;
     }
 
-    private function storeDocument(array $attachment): int
+    private function storeDocument(array $attachment, ?array &$createdFiles = null): int
     {
         if (! preg_match('#^data:([A-Za-z0-9.+/-]+);base64,([A-Za-z0-9+/=]+)$#', (string) ($attachment['data'] ?? ''), $matches)) {
             abort(422, 'Please reselect the attachment before saving.');
@@ -1754,16 +1932,47 @@ class CmsContentController extends Controller
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         abort_unless(in_array($extension, ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg'], true), 422, 'The attachment file type is not allowed.');
         $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) ?: 'application/octet-stream';
+        $allowedMime = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'application/vnd.ms-powerpoint',
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'text/plain',
+            'image/png',
+            'image/jpeg',
+        ];
+        abort_unless(in_array($mime, $allowedMime, true), 422, 'The attachment file type is not allowed.');
         $path = 'documents/' . Str::uuid() . '-' . Str::slug(pathinfo($name, PATHINFO_FILENAME)) . '.' . $extension;
-        Storage::disk('public')->put($path, $bytes);
+        abort_unless(Storage::disk('local')->put($path, $bytes), 500, 'The uploaded document could not be stored.');
+        if ($createdFiles !== null) {
+            $createdFiles[] = ['disk' => 'local', 'path' => $path];
+        }
 
-        return DB::table('documents')->insertGetId([
+        $documentId = DB::table('documents')->insertGetId([
             'title'     => pathinfo($name, PATHINFO_FILENAME),
+            'category_id' => DB::table('document_categories')->orderBy('category_id')->value('category_id'),
+            'created_by' => request()->user()?->user_id,
             'file_name' => $name,
-            'file_path' => '/storage/' . $path,
+            'file_path' => 'private/' . $path,
             'mime_type' => $mime,
             'file_size' => strlen($bytes),
         ], 'document_id');
+        if ($documentId) {
+            DB::table('document_versions')->insert([
+                'document_id' => $documentId,
+                'uploaded_by' => request()->user()?->user_id,
+                'version_no' => 1,
+                'file_name' => $name,
+                'file_path' => 'private/' . $path,
+                'file_type' => $mime,
+                'file_size_kb' => (int) ceil(strlen($bytes) / 1024),
+                'created_at' => now(),
+            ]);
+        }
+        return $documentId;
     }
 
     private function storedFileResponse(string $path, ?string $mime, ?string $name, bool $download = true): Response
@@ -1786,6 +1995,22 @@ class CmsContentController extends Controller
                 }
             };
 
+            return $download
+                ? response()->streamDownload($sendStream, $name ?: basename($diskPath), $headers)
+                : response()->stream($sendStream, 200, $headers);
+        }
+        if (str_starts_with($path, 'private/')) {
+            $diskPath = substr($path, strlen('private/'));
+            abort_unless(Storage::disk('local')->exists($diskPath), 404);
+            $stream = Storage::disk('local')->readStream($diskPath);
+            abort_unless(is_resource($stream), 404);
+            $sendStream = static function () use ($stream): void {
+                try {
+                    fpassthru($stream);
+                } finally {
+                    fclose($stream);
+                }
+            };
             return $download
                 ? response()->streamDownload($sendStream, $name ?: basename($diskPath), $headers)
                 : response()->stream($sendStream, 200, $headers);
@@ -1816,10 +2041,22 @@ class CmsContentController extends Controller
         return route('cms.media', ['id' => $id]);
     }
 
+    private function sanitizeRichText(string $html): string
+    {
+        $clean = strip_tags($html, '<p><br><strong><b><em><i><u><ul><ol><li><a><blockquote><h1><h2><h3>');
+        $clean = preg_replace('/<a\b[^>]*>/i', '<a>', $clean) ?? $clean;
+        $clean = preg_replace('/\s+(on[a-z]+|style|class|id)\s*=("[^"]*"|\'[^\']*\'|[^\s>]*)/i', '', $clean) ?? $clean;
+
+        return trim($clean);
+    }
+
     private function storedFileExists(string $path): bool
     {
         if (str_starts_with($path, '/storage/')) {
             return Storage::disk('public')->exists(substr($path, strlen('/storage/')));
+        }
+        if (str_starts_with($path, 'private/')) {
+            return Storage::disk('local')->exists(substr($path, strlen('private/')));
         }
         $uploadsRoot = realpath(base_path('../uploads'));
         $file        = realpath(base_path('../' . ltrim($path, '/')));
@@ -1830,6 +2067,7 @@ class CmsContentController extends Controller
     private function uniqueSlug(string $table, string $column, string $value): string
     {
         $slug      = Str::slug($value) ?: Str::random(10);
+        $slug      = substr($slug, 0, 243);
         $candidate = $slug;
         $suffix    = 2;
         while (DB::table($table)->where($column, $candidate)->exists()) {
@@ -1842,6 +2080,7 @@ class CmsContentController extends Controller
     private function uniqueSlugExcept(string $table, string $column, string $value, string $idColumn, int $id): string
     {
         $slug = Str::slug($value) ?: Str::random(10);
+        $slug = substr($slug, 0, 243);
         $candidate = $slug;
         $suffix = 2;
         while (DB::table($table)->where($column, $candidate)->where($idColumn, '<>', $id)->exists()) {

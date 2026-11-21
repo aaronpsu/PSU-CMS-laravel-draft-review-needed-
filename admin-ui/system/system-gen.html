@@ -103,12 +103,12 @@
                 <h1>General Settings</h1>
                 <p class="page-description">Basic website configuration.</p>
             </div>
-            <button class="back-button" type="button" onclick="window.history.back()">
+            <a class="back-button" href="../dashboard/dashboard.html">
                 <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
                     <path d="M12.5 4.5 7 10l5.5 5.5M7.5 10h9"></path>
                 </svg>
                 <span>Back</span>
-            </button>
+            </a>
         </div>
 
         <form class="website-information-form">
@@ -131,16 +131,16 @@
 
                     <div class="information-field">
                         <label for="default-language">Default Language</label>
-                        <select id="default-language" name="default_language">
-                            <option value="en" selected>English</option>
-                            <option value="fil">Filipino</option>
-                            <option value="es">Spanish</option>
+                        <select id="default-language" name="default_language" data-cms-select data-block>
+                        <option value="English" selected>English</option>
+                        <option value="Filipino">Filipino</option>
+                        <option value="Spanish">Spanish</option>
                         </select>
                     </div>
 
                     <div class="information-field">
                         <label for="time-zone">Time zone</label>
-                        <select id="time-zone" name="time_zone">
+                        <select id="time-zone" name="time_zone" data-cms-select data-block>
                             <option value="Asia/Manila" selected>Asia/Manila (GMT+8)</option>
                             <option value="UTC">UTC</option>
                             <option value="America/New_York">America/New_York</option>
@@ -154,7 +154,7 @@
 
             <div class="form-actions">
                 <button class="form-button form-button-secondary" type="reset">Cancel</button>
-                <button class="form-button form-button-primary" type="button">Save Changes</button>
+                <button class="form-button form-button-primary" type="submit">Save Changes</button>
             </div>
         </form>
     </main>
@@ -165,8 +165,10 @@
     <script src="../js/seed-data.js"></script>
     <script src="../js/sanitize.js"></script>
     <script src="../js/storage.js"></script>
+    <script src="../js/api-client.js"></script>
     <script src="../js/ui.js"></script>
     <script src="../js/layout.js"></script>
+    <script src="../js/site-settings.js"></script>
 </body>
 
 </html>

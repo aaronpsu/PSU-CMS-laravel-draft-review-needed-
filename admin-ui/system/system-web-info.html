@@ -104,12 +104,12 @@
                 <h1>Website Information</h1>
                 <p class="page-description">Official university details</p>
             </div>
-            <button class="back-button" type="button" onclick="window.history.back()">
+            <a class="back-button" href="../dashboard/dashboard.html">
                 <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
                     <path d="M12.5 4.5 7 10l5.5 5.5M7.5 10h9"></path>
                 </svg>
                 <span>Back</span>
-            </button>
+            </a>
         </div>
 
         <form class="website-information-form">
@@ -158,7 +158,7 @@
 
             <div class="form-actions">
                 <button class="form-button form-button-secondary" type="reset">Cancel</button>
-                <button class="form-button form-button-primary" type="button">Save Changes</button>
+                <button class="form-button form-button-primary" type="submit">Save Changes</button>
             </div>
         </form>
     </main>
@@ -169,8 +169,10 @@
     <script src="../js/seed-data.js"></script>
     <script src="../js/sanitize.js"></script>
     <script src="../js/storage.js"></script>
+    <script src="../js/api-client.js"></script>
     <script src="../js/ui.js"></script>
     <script src="../js/layout.js"></script>
+    <script src="../js/site-settings.js"></script>
 </body>
 
 </html>

@@ -29,6 +29,7 @@
     var dateSel = document.getElementById('announcementFilterDate');
     var campusSel = document.getElementById('announcementFilterCampus');
     var prioritySel = document.getElementById('announcementFilterPriority');
+    var loadRequest = 0;
 
     ui.setOptions(statusSel, [{ value: '', label: 'All Status' }].concat(cfg.announcementStatuses, [{ value: 'expired', label: 'Expired' }]), '');
     ui.setOptions(dateSel, [
@@ -78,10 +79,14 @@
     }
 
     function load() {
+      var requestId = ++loadRequest;
       CMS.api.query('/announcements', {
         q: state.q, category: state.category, status: state.status, date: state.date,
         campus: state.campus, priority: state.priority
-      }).then(render).catch(function (error) {
+      }).then(function (rows) {
+        if (requestId === loadRequest) render(rows);
+      }).catch(function (error) {
+        if (requestId !== loadRequest) return;
         tableWrap.hidden = true; emptyBox.hidden = false; ui.clear(footer);
         ui.renderEmpty(emptyBox, { title: 'Could not load announcements', text: error.message });
       });
@@ -125,6 +130,7 @@
   /* ======================= Add / Edit Announcement (form) ======================= */
   async function initForm() {
     var form = document.getElementById('announcementForm');
+    var saveButtons = [document.getElementById('announcementSaveDraft'), document.getElementById('announcementPublish')];
     var f = {
       title: document.getElementById('announcementTitle'), category: document.getElementById('announcementCategory'),
       status: document.getElementById('announcementStatus'), campus: document.getElementById('announcementCampus'),
@@ -138,7 +144,7 @@
     var targetNote = document.getElementById('announcementTarget');
     var attachment = null;
 
-    var editing = null, editId = ui.getParam('id'), options;
+    var editing = null, editId = ui.getParam('id'), options, saving = false;
     try {
       options = await CMS.api.get('/options');
       if (editId) editing = await CMS.api.get('/announcements/' + encodeURIComponent(editId));
@@ -190,7 +196,7 @@
       if (!file) return;
       var ext = (file.name.split('.').pop() || '').toLowerCase();
       if (ALLOWED_EXT.indexOf(ext) === -1) { ui.toast('That file type is not allowed. Use PDF, Office documents, TXT, PNG or JPG.', 'error'); return; }
-      if (file.size > cfg.documentMaxFileBytes) { ui.toast('That file is larger than ' + ui.formatSize(cfg.documentMaxFileBytes) + '.', 'error'); return; }
+      if (file.size > cfg.documentMaxFileBytes) { ui.toast('Attachments cannot be larger than ' + ui.formatSize(cfg.documentMaxFileBytes) + '.', 'error'); return; }
       var meta = { name: file.name, size: file.size, type: file.type || ext };
       if (file.size > INLINE_FILE_LIMIT) { attachment = meta; renderAttachment(); return; }
       var reader = new FileReader();
@@ -233,8 +239,11 @@
     }
 
     async function save(mode) {
+      if (saving) return;
       var status = mode === 'publish' ? 'published' : (f.status.value === 'published' ? 'draft' : f.status.value);
       if (!validate(status)) return;
+      saving = true;
+      saveButtons.forEach(function (button) { button.disabled = true; });
       var record = {
         title: f.title.value.trim(), categoryId: Number(f.category.value),
         campusId: f.campus && f.campus.value !== 'all' ? Number(f.campus.value) : null,
@@ -248,9 +257,13 @@
         ui.flash(status === 'published' ? 'Announcement published.' : editing ? 'Announcement updated.' : 'Announcement saved.', 'success');
         window.location.href = 'all-announcements.html';
       } catch (error) { ui.toast(error.message, 'error'); }
+      finally {
+        saving = false;
+        saveButtons.forEach(function (button) { button.disabled = false; });
+      }
     }
-    document.getElementById('announcementSaveDraft').addEventListener('click', function () { save('draft'); });
-    document.getElementById('announcementPublish').addEventListener('click', function () { save('publish'); });
+    saveButtons[0].addEventListener('click', function () { save('draft'); });
+    saveButtons[1].addEventListener('click', function () { save('publish'); });
     form.addEventListener('submit', function (e) { e.preventDefault(); });
   }
 

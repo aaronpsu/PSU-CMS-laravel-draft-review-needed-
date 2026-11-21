@@ -1,5 +1,7 @@
 Options -Indexes
 
+RedirectMatch 404 "(?i)^/laravel-admin-api(?:/|$)"
+
 <FilesMatch "^(?i:config\.php|config\.sample\.php|schema\.sql|bootstrap\.php|README\.md|composer\.(?:json|lock))$">
   Require all denied
 </FilesMatch>

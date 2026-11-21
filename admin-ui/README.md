@@ -3,7 +3,7 @@
 Static HTML / CSS / vanilla JS / Bootstrap 5 screens for the PSU CMS admin panel.
 News, Announcements, Events, Event Categories, Faculty & Staff Directory,
 Colleges, Departments, Academic Programs, and Users use the local Laravel API
-and the `cms_db` database from `cms_db_2.sql`. Documents, Media, Campuses, and
+and the `psu_cms_admin` database from `psu_cms_admin.sql`. Documents, Media, Campuses, and
 News/Announcement Categories are also managed through Laravel. Their keyword
 and available dropdown filters run against that database. Other prototype screens
 still use `localStorage`.
@@ -34,7 +34,7 @@ for database setup and API details.
 | `categories/content-categories.html`, `js/content-categories.js` | Laravel-backed News and Announcement category management |
 | `faculty/`, `js/faculty.js` | Faculty & Staff Directory connected to the Laravel API |
 | `js/ui.js` | Toasts, confirm/detail modals, pagination, custom selects, highlight, image reader |
-| `js/layout.js` | Sidebar/header behavior (active link, groups, mobile drawer, header search) |
+| `js/layout.js` | Sidebar/header behavior, current-database notifications, and the configured public-site link |
 | `vendor/` | Bootstrap 5.3.3, Bootstrap Icons 1.11.3, Inter font — **local on purpose** (see CSP) |
 
 ## Why Bootstrap is vendored
@@ -54,11 +54,17 @@ the layout falls back to the original screenshots.
 ## Remaining prototype screens
 
 Global Search still searches browser-storage sample data rather than Laravel data.
-Dashboard, Homepage Management, Contact & Feedback, Settings, and Appearance
-remain placeholders and have no corresponding tables in `cms_db_2.sql`.
-Notifications and the account control explain that there is no notification
-table or authenticated session in this prototype. See the Laravel API README
-for schema limitations.
+Dashboard, Homepage Management, and Contact & Feedback remain placeholders.
+General Settings and Website Information load from and save to the
+`site_settings` table; the public site's name, homepage description, and logo
+use those saved settings. Theme preferences remain local to the browser.
+Account sign-in and Security Settings use the local session-authenticated
+Laravel API.
+The shared header loads the signed-in user's notifications from the
+`notifications` table in `psu_cms_admin`; it shows an empty state when that user
+has no notification records. The public View Website link uses the root PHP
+homepage, which reads published records from the current `psu_cms_admin`
+database.
 
 ## Converting other views to Laravel later
 - Shared sidebar/header HTML is inside `<!-- BEGIN SHARED -->` / `<!-- END SHARED -->` comments in every page →
@@ -89,10 +95,10 @@ The Colleges, Departments, Programs, Campuses, and content categories use databa
 Notes for the team:
 - The sidebar groups **University Structure** and **User Management** replaced the two placeholder links in every page.
 - These API-backed pages no longer save or display their localStorage sample records.
-- New user passwords are hashed by Laravel and never returned. The prototype has no login/session system or authorization checks; do not use it to manage real administrator access.
+- New user passwords are hashed by Laravel and never returned. The API uses a local session-based sign-in; it is still a prototype and should not be exposed or used for real administrator access without a production security review.
 - College logos are uploaded to the schema's Media table. Fields unsupported by the v2 schema (such as college vision or program campus/syllabus) are omitted.
 - The User Roles page cannot create independent roles or configure permissions because the schema has no roles or permissions table.
-- The schema has no notifications table and this prototype has no authentication/session system. Header controls state those limitations instead of implying a signed-in user or persisted alerts.
+- The shared header reads per-user notifications and unread counts from `psu_cms_admin.notifications`; unread alerts can be marked as read. Account and Security Settings use the signed-in Laravel session. API mutations include the session CSRF token and are role-protected; the backend remains loopback-only for local development.
 - Document Library supports uploads up to 300 KB (matching the announcement attachment API); Media Library supports image uploads up to 5 MB.
 
 ## Git
