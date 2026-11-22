@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Http\Controllers\CmsContentController;
 use App\Http\Controllers\DashboardController;
