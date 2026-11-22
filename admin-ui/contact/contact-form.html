@@ -24,7 +24,7 @@
     <section class="cms-card contact-card" aria-labelledby="contactTitle">
       <h1 class="cms-page-title" id="contactTitle">Contact &amp; Feedback</h1>
       <p class="cms-page-sub contact-intro">Send a question or comment to the campus team.</p>
-      <p class="contact-note"><i class="bi bi-info-circle" aria-hidden="true"></i><span>Prototype: messages are saved in this browser only (localStorage) and appear in the admin inbox. No email is sent.</span></p>
+      <p class="contact-note"><i class="bi bi-info-circle" aria-hidden="true"></i><span>Messages are sent securely to the campus inbox. Submission confirmation is shown here.</span></p>
       <div id="contactBanner" role="alert" hidden></div>
 
       <!-- PHP: method="post" + hidden CSRF input here; the server must validate again -->
@@ -36,7 +36,7 @@
           </div>
           <div class="cms-field">
             <label class="cms-label cms-required" for="contactEmail">Email</label>
-            <input class="cms-input" id="contactEmail" type="email" maxlength="190" autocomplete="email">
+            <input class="cms-input" id="contactEmail" type="email" maxlength="150" autocomplete="email">
             <p class="cms-field-error" role="alert"></p>
           </div>
           <div class="cms-field">
@@ -93,10 +93,7 @@
 
   <script src="../vendor/bootstrap/bootstrap.bundle.min.js"></script>
   <script src="../js/config.js"></script>
-  <script src="../js/seed-data.js"></script>
-  <script src="../js/sanitize.js"></script>
-  <script src="../js/storage.js"></script>
-  <script src="../js/message-store.js"></script>
+  <script src="../js/api-client.js"></script>
   <script src="../js/ui.js"></script>
   <script src="../js/contact.js"></script>
 </body>

@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\DB;
  *
  * Read-only aggregates for the admin dashboard. All figures come from cms_db;
  * nothing is cached or invented. The schema has no audit-log table, so "recent
- * activity" is derived from created_at/updated_at and the created_by/updated_by
- * user references (see activity()).
+ * activity" is derived from created_at/updated_at and the available creator
+ * references in the PSU schema.
  */
 class DashboardController extends Controller
 {
@@ -124,11 +124,11 @@ class DashboardController extends Controller
     private function recentActivity(): array
     {
         $sources = [
-            ['news', 'news_id', 'title', 'news', 'COALESCE(t.updated_by, t.created_by)', 't.status', 't.updated_at'],
-            ['announcements', 'announcement_id', 'title', 'announcement', 'COALESCE(t.updated_by, t.created_by)', 't.status', 't.updated_at'],
-            ['events', 'event_id', 'title', 'event', 'COALESCE(t.updated_by, t.created_by)', 't.status', 't.updated_at'],
-            ['faculty', 'faculty_id', 'name', 'personnel', 'COALESCE(t.updated_by, t.created_by)', 'NULL', 't.updated_at'],
-            ['documents', 'document_id', 'COALESCE(t.title, t.file_name)', 'document', 't.uploaded_by', 'NULL', 't.created_at'],
+            ['news', 'news_id', 'title', 'news', 't.created_by', 't.status', 't.updated_at'],
+            ['announcements', 'announcement_id', 'title', 'announcement', 't.created_by', 't.status', 't.updated_at'],
+            ['events', 'event_id', 'title', 'event', 't.created_by', 't.status', 't.updated_at'],
+            ['faculty_staff', 'faculty_id', "CONCAT_WS(' ', NULLIF(t.first_name, ''), NULLIF(t.middle_name, ''), NULLIF(t.last_name, ''))", 'personnel', 'NULL', 't.status', 't.updated_at'],
+            ['documents', 'document_id', 'COALESCE(t.title, t.file_name)', 'document', 't.created_by', 'NULL', 't.created_at'],
         ];
 
         $union = null;

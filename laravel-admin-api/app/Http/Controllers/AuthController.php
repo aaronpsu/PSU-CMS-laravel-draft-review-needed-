@@ -17,7 +17,7 @@ class AuthController extends Controller
     public function setupStatus(Request $request): JsonResponse
     {
         $hasAdmin = DB::table('users')
-            ->where('role', 'admin')
+            ->whereIn('role_id', DB::table('roles')->whereIn('name', ['Super Administrator', 'Administrator'])->select('role_id'))
             ->where('status', 'active')
             ->exists();
 
@@ -27,7 +27,7 @@ class AuthController extends Controller
     public function setupInitial(Request $request): JsonResponse
     {
         $hasAdmin = DB::table('users')
-            ->where('role', 'admin')
+            ->whereIn('role_id', DB::table('roles')->whereIn('name', ['Super Administrator', 'Administrator'])->select('role_id'))
             ->where('status', 'active')
             ->exists();
         abort_if($hasAdmin, 409, 'An active administrator already exists.');
@@ -71,7 +71,6 @@ class AuthController extends Controller
 
         $userId = DB::table('users')->insertGetId([
             'role_id' => $roleId,
-            'role' => 'admin',
             'campus_id' => $campusId,
             'username' => $username,
             'first_name' => $nameParts[0],

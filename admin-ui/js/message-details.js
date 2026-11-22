@@ -22,8 +22,7 @@
     return el('span', { class: 'message-meta-item' }, [el('span', { class: 'message-meta-label', text: label + ': ' }), value]);
   }
 
-  function render() {
-    var m = store.get(id);
+  function render(m) {
     ui.clear(box);
     if (!m) {
       var empty = el('div', { class: 'cms-card' });
@@ -55,8 +54,9 @@
     var readBtn = el('button', { type: 'button', class: 'cms-btn cms-btn-outline message-btn' });
     if (m.status === 'unread') { readBtn.textContent = 'Mark as Read'; readBtn.addEventListener('click', function () { changeStatus('read', 'Message marked as read.'); }); }
     else if (m.status === 'read') { readBtn.textContent = 'Mark as Unread'; readBtn.addEventListener('click', function () { changeStatus('unread', 'Message marked as unread.'); }); }
-    else { readBtn.textContent = 'Mark as Read'; readBtn.disabled = true; }       // responded stays responded
+    else {     readBtn.textContent = 'Mark as Read'; readBtn.disabled = true; }       // responded stays responded
     var replyBtn = el('button', { type: 'button', class: 'cms-btn cms-btn-primary message-btn', text: 'Reply via Email' });
+    replyBtn.hidden = m.type === 'feedback';
     var delBtn = el('button', { type: 'button', class: 'cms-btn cms-btn-outline message-btn message-btn-danger', text: 'Delete' });
     replyBtn.addEventListener('click', function () { openReply(m); });
     delBtn.addEventListener('click', function () { removeMessage(m); });
@@ -77,16 +77,19 @@
   }
 
   function changeStatus(status, okMessage) {
-    if (store.setStatus(id, status)) { ui.toast(okMessage, 'success'); render(); }
-    else ui.toast('The status could not be updated.', 'error');
+    store.setStatus(id, status)
+      .then(function (message) { ui.toast(okMessage, 'success'); render(message); })
+      .catch(function (error) { ui.toast(error.message, 'error'); });
   }
 
   function removeMessage(m) {
     store.confirmDelete()
       .then(function (yes) {
         if (!yes) return;
-        if (store.remove(m.id)) { ui.flash('Message deleted.', 'success'); window.location.href = 'all-messages.html'; }
-        else ui.toast('The message could not be deleted.', 'error');
+        store.remove(m.id).then(function () {
+          ui.flash('Message deleted.', 'success');
+          window.location.href = 'all-messages.html';
+        }).catch(function (error) { ui.toast(error.message, 'error'); });
       });
   }
 
@@ -117,15 +120,22 @@
       if (!subj.value.trim()) { ui.setError(subj, 'Enter a subject.'); ok = false; }
       if (text.value.trim().length < 5) { ui.setError(text, 'Write a reply of at least 5 characters.'); ok = false; }
       if (!ok) return;
-      if (store.saveReply(id, subj.value.trim(), text.value.trim())) {
+      send.disabled = true;
+      store.saveReply(id, subj.value.trim(), text.value.trim()).then(function (updated) {
         modal.hide();
         ui.toast('Reply saved for ' + m.fullName + ' and the message is now Responded. (Simulated \u2014 no email was sent.)', 'success');
-        render();
-      } else ui.toast('The reply could not be saved.', 'error');
+        render(updated);
+      }).catch(function (error) {
+        send.disabled = false;
+        ui.toast(error.message, 'error');
+      });
     }
     send.addEventListener('click', submit);
     form.addEventListener('submit', function (e) { e.preventDefault(); submit(); });
   }
 
-  render();
+  store.get(id).then(render).catch(function (error) {
+    if (error.status === 404) render(null);
+    else ui.renderEmpty(box, { title: 'Unable to load message', text: error.message });
+  });
 })();

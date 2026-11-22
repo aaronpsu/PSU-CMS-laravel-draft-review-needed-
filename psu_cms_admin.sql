@@ -209,6 +209,7 @@ CREATE TABLE `contact_submissions` (
   `subject` varchar(255) NOT NULL,
   `message` text NOT NULL,
   `status` varchar(20) NOT NULL DEFAULT 'unread',
+  `reply_subject` varchar(255) DEFAULT NULL,
   `reply_message` text DEFAULT NULL,
   `received_at` datetime NOT NULL DEFAULT current_timestamp(),
   `replied_at` datetime DEFAULT NULL,
@@ -481,6 +482,7 @@ CREATE TABLE `event_categories` (
   `name` varchar(80) NOT NULL,
   `description` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`category_id`),
+  UNIQUE KEY `uq_event_categories_id` (`id`),
   UNIQUE KEY `uq_event_categories_name` (`name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -491,7 +493,7 @@ CREATE TABLE `event_categories` (
 
 LOCK TABLES `event_categories` WRITE;
 /*!40000 ALTER TABLE `event_categories` DISABLE KEYS */;
-INSERT INTO `event_categories` VALUES (1,1,'Academic','Lectures, seminars and conferences'),(2,NULL,'Cultural','Arts, festivals, and heritage events'),(3,NULL,'Sports','Intramurals and athletic meets'),(4,NULL,'Seminar','Workshops and trainings'),(5,5,'Social','Student social and cultural events');
+INSERT INTO `event_categories` (`category_id`, `id`, `name`, `description`) VALUES (1,1,'Academic','Lectures, seminars and conferences'),(2,2,'Cultural','Arts, festivals, and heritage events'),(3,3,'Sports','Intramurals and athletic meets'),(4,4,'Seminar','Workshops and trainings'),(5,5,'Social','Student social and cultural events');
 /*!40000 ALTER TABLE `event_categories` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -755,6 +757,52 @@ LOCK TABLES `homepage_sections` WRITE;
 /*!40000 ALTER TABLE `homepage_sections` DISABLE KEYS */;
 /*!40000 ALTER TABLE `homepage_sections` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Homepage Management tables used by the Laravel admin API
+--
+
+DROP TABLE IF EXISTS `homepage_settings`;
+CREATE TABLE `homepage_settings` (
+  `setting_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `setting_key` varchar(100) NOT NULL,
+  `setting_value` longtext DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`setting_id`),
+  UNIQUE KEY `homepage_settings_setting_key_unique` (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `homepage_banners`;
+CREATE TABLE `homepage_banners` (
+  `banner_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `title` varchar(255) NOT NULL,
+  `subtitle` text DEFAULT NULL,
+  `image_path` varchar(500) NOT NULL,
+  `button_label` varchar(100) DEFAULT NULL,
+  `button_url` varchar(2048) DEFAULT NULL,
+  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`banner_id`),
+  KEY `homepage_banners_is_active_sort_order_index` (`is_active`,`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+DROP TABLE IF EXISTS `homepage_featured_items`;
+CREATE TABLE `homepage_featured_items` (
+  `featured_item_id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `content_type` enum('news','announcements','events') NOT NULL,
+  `content_id` int(10) unsigned NOT NULL,
+  `section_title` varchar(255) DEFAULT NULL,
+  `sort_order` int(10) unsigned NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`featured_item_id`),
+  KEY `homepage_featured_content_idx` (`content_type`,`content_id`),
+  KEY `homepage_featured_order_idx` (`is_active`,`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Table structure for table `login_attempts`
