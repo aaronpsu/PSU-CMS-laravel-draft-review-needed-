@@ -260,9 +260,11 @@ CMS.layout = (function () {
       form.lastChild.appendChild(email);
       form.appendChild(CMS.ui.el('label', { class: 'form-label', text: 'Password' }));
       form.lastChild.appendChild(password);
-      body = [form];
       var signIn = CMS.ui.el('button', { type: 'submit', class: 'btn btn-primary', text: 'Sign in' });
-      footer = [signIn];
+      signIn.style.width = '100%';
+      form.appendChild(signIn);
+      body = [form];
+      footer = [];
       modal = CMS.ui.openModal(CMS.ui.modalShell('Sign in to PSU CMS', body, footer));
       form.addEventListener('submit', function (event) {
         event.preventDefault();

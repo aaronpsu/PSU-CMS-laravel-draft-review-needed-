@@ -13,6 +13,8 @@ Route::middleware([LocalPrototypeOnly::class, 'web'])
     ->controller(AuthController::class)
     ->group(function (): void {
         Route::get('/csrf', 'csrf');
+        Route::get('/setup/status', 'setupStatus');
+        Route::post('/setup', 'setupInitial')->middleware('cms.json');
         Route::post('/login', 'login')->middleware('cms.json');
 
         Route::middleware(['auth:web', 'cms.json'])->group(function (): void {

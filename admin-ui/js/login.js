@@ -26,4 +26,5 @@
       submit.textContent = 'Sign in';
     });
   });
+
 })();

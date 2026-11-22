@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="../css/login.css" />
+    <title>Initial Administrator Setup</title>
+  </head>
+  <body>
+    <main class="login-card setup-card">
+      <div class="logo">
+        <img src="../assets/images/psu-logo.png" alt="Pangasinan State University logo" />
+      </div>
+      <h1>Initial Setup</h1>
+      <p class="login-intro">Create the first administrator account for this CMS.</p>
+
+      <p id="setupStatus" role="status"></p>
+      <p id="setupError" role="alert" hidden></p>
+
+      <form id="cmsSetupForm" novalidate>
+        <div class="form-field">
+          <label for="setupName">Full Name</label>
+          <input type="text" id="setupName" name="fullName" maxlength="150" autocomplete="name" required />
+        </div>
+        <div class="form-field">
+          <label for="setupEmail">Email</label>
+          <input type="email" id="setupEmail" name="email" maxlength="255" autocomplete="email" required />
+        </div>
+        <div class="form-field">
+          <label for="setupPassword">Password</label>
+          <input type="password" id="setupPassword" name="password" minlength="12" maxlength="1024" autocomplete="new-password" required />
+        </div>
+        <button type="submit">Create Administrator</button>
+      </form>
+    </main>
+    <script src="../js/config.js"></script>
+    <script src="../js/api-client.js"></script>
+    <script src="../js/setup.js"></script>
+  </body>
+</html>

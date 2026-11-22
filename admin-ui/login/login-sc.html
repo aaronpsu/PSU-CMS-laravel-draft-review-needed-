@@ -1,65 +1,54 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="../css/login.css" />
-    <title>Login</title>
-  </head>
 
-  <body>
-    <main class="login-card">
-      <!-- LOGIN FORM -->
-      <!-- CLICKABLE LINK -->
-      <!-- INPUT FIELD -->
-      <!-- ASSETS -->
-      <!-- university logo -->
-      <!-- ASSETS -->
-      <div class="logo">
-        <img
-          src="../assets/images/psu-logo.png"
-          alt="Pangasinan State University logo"
-        />
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="../css/login.css" />
+  <title>Login</title>
+</head>
+
+<body>
+  <main class="login-card">
+    <!-- LOGIN FORM -->
+    <!-- CLICKABLE LINK -->
+    <!-- INPUT FIELD -->
+    <!-- ASSETS -->
+    <!-- university logo -->
+    <!-- ASSETS -->
+    <div class="logo">
+      <img src="../assets/images/psu-logo.png" alt="Pangasinan State University logo" />
+    </div>
+
+    <h1>PSU CMS</h1>
+    <p class="login-intro">Administration Panel – Sign in to continue</p>
+
+    <p id="loginError" role="alert" hidden></p>
+    <form id="cmsLoginForm" novalidate>
+      <div class="form-field">
+        <label for="username">Username or Email</label>
+        <!-- RAW DATA -->
+        <input type="text" id="username" placeholder="admin@psu.edu.ph" name="username" autocomplete="username"
+          required />
       </div>
 
-      <h1>PSU CMS</h1>
-      <p class="login-intro">Administration Panel – Sign in to continue</p>
-
-      <p id="loginError" role="alert" hidden></p>
-      <form id="cmsLoginForm" novalidate>
-        <div class="form-field">
-          <label for="username">Username or Email</label>
-          <!-- RAW DATA -->
-          <input
-            type="text"
-            id="username"
-            placeholder="admin@psu.edu.ph"
-            name="username"
-            autocomplete="username"
-            required
-          />
-        </div>
-
-        <div class="form-field">
-          <label for="password">Password</label>
-          <!-- RAW DATA -->
-          <input
-            type="password"
-            id="password"
-            placeholder="••••••••"
-            name="password"
-            autocomplete="current-password"
-            required
-          />
-        </div>
-
-        <div class="form-options"></div>
+      <div class="form-field">
+        <label for="password">Password</label>
         <!-- RAW DATA -->
-        <button type="submit">Sign in</button>
-      </form>
-    </main>
-    <script src="../js/config.js"></script>
-    <script src="../js/api-client.js"></script>
-    <script src="../js/login.js"></script>
-  </body>
+        <input type="password" id="password" placeholder="••••••••" name="password" autocomplete="current-password"
+          required />
+      </div>
+
+      <div class="form-options"></div>
+      <!-- RAW DATA -->
+      <button type="submit">Sign in</button>
+    </form>
+    <p class="setup-link"><a href="../setup/setup.html">Sign-up</a></p>
+
+  </main>
+  <script src="../js/config.js"></script>
+  <script src="../js/api-client.js"></script>
+  <script src="../js/login.js"></script>
+</body>
+
 </html>
