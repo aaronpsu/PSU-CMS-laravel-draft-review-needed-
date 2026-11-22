@@ -9,11 +9,11 @@
     <link rel="stylesheet" href="../css/cms-base.css">
     <link rel="stylesheet" href="../css/cms-layout.css">
     <link rel="stylesheet" href="../css/cms-components.css">
-    <link rel="stylesheet" href="../css/homepage-mg.css?v=1">
+    <link rel="stylesheet" href="../css/homepage.css?v=2">
     <title>Homepage Management | PSU Admin</title>
 </head>
 
-<body class="cms-body" data-page="homepage">
+<body class="cms-body" data-page="homepage" data-hp="overview">
     <div class="cms-shell">
         <aside class="cms-sidebar" id="cmsSidebar" aria-label="Sidebar">
             <a class="cms-brand" href="../index.html">
@@ -94,23 +94,20 @@
                 </div>
             </header>
 
-    <main class="cms-content dashboard-content" id="homepage-management">
-        <div class="page-heading">
-            <div class="page-heading-copy">
-                <h1>Homepage Management</h1>
-                <p class="page-description">Manage the content and sections displayed on the official PSU website</p>
-            </div>
-            <div class="homepage-actions" aria-label="Homepage management actions">
-                <a class="homepage-action homepage-action-primary" href="homepage-coedit.html">Edit Homepage</a>
-                <a class="homepage-action" href="homepage-banner-mg.html">Manage Banner</a>
-                <a class="homepage-action" href="homepage-feature.html">Manage Featured Sections</a>
-            </div>
-        </div>
-
-        <section class="selected-banner" aria-label="Banner preview">
-            <div class="selected-banner-placeholder" role="img" aria-label="Website Thumbnail Placeholder">Website Thumbnail Placeholder</div>
-        </section>
-    </main>
+                <main class="cms-content" id="homepage-management">
+                <div class="hp-head">
+                    <div class="hp-head-copy">
+                        <h1 class="hp-title">Homepage Management</h1>
+                        <p class="hp-sub">Manage the content and sections displayed on the official PSU website.</p>
+                    </div>
+                    <div class="hp-actions" aria-label="Homepage management actions">
+                        <a class="cms-btn cms-btn-primary" href="homepage-coedit.html">Edit Homepage</a>
+                        <a class="cms-btn cms-btn-outline" href="homepage-banner-mg.html">Manage Banner</a>
+                        <a class="cms-btn cms-btn-outline" href="homepage-feature.html">Manage Featured Sections</a>
+                    </div>
+                </div>
+                <div id="hpOverview" aria-live="polite"></div>
+            </main>
         </div>
     </div>
     <script src="../vendor/bootstrap/bootstrap.bundle.min.js"></script>
@@ -120,6 +117,8 @@
     <script src="../js/storage.js"></script>
     <script src="../js/ui.js"></script>
     <script src="../js/layout.js"></script>
+    <script src="../js/api-client.js"></script>
+    <script src="../js/homepage.js"></script>
 </body>
 
 </html>

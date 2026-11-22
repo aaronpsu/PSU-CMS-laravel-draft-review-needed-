@@ -9,11 +9,11 @@
     <link rel="stylesheet" href="../css/cms-base.css">
     <link rel="stylesheet" href="../css/cms-layout.css">
     <link rel="stylesheet" href="../css/cms-components.css">
-    <link rel="stylesheet" href="../css/banner-mg.css?v=20">
+    <link rel="stylesheet" href="../css/homepage.css?v=2">
     <title>Banner Management | PSU Admin</title>
 </head>
 
-<body class="cms-body" data-page="homepage">
+<body class="cms-body" data-page="homepage" data-hp="banners">
     <div class="cms-shell">
         <aside class="cms-sidebar" id="cmsSidebar" aria-label="Sidebar">
             <a class="cms-brand" href="../index.html">
@@ -94,74 +94,19 @@
                 </div>
             </header>
 
-    <main class="cms-content dashboard-content" id="homepage-management">
-        <div class="page-heading">
-            <div class="page-heading-copy">
-                <h1>Banner Management</h1>
-                <p class="page-description">Manage homepage banner slides.</p>
-            </div>
-            <a class="add-banner-button" href="homepage-banner-mg-add.html">+ Add New Banner</a>
-        </div>
-
-        <section class="banner-grid" aria-label="Homepage banner slides">
-            <article class="banner-card">
-                <div class="banner-image banner-image-placeholder" role="img" aria-label="Banner Image">Banner Image</div>
-                <div class="banner-details">
-                    <h2>Enrollment Now Open</h2>
-                    <p>Short banner description shown over the image.</p>
-                    <div class="banner-card-footer">
-                        <span class="banner-status">Active</span>
-                        <div class="banner-actions">
-                            <a class="banner-action edit-action" href="homepage-banner-mg-edit.html">Edit</a>
-                            <button class="banner-action delete-action" type="button">Delete</button>
-                        </div>
+                <main class="cms-content" id="homepage-management">
+                <div class="hp-head">
+                    <div class="hp-head-copy">
+                        <h1 class="hp-title">Banner Management</h1>
+                        <p class="hp-sub">Manage homepage banner slides. Banners show on the website in the order listed here.</p>
+                    </div>
+                    <div class="hp-actions">
+                        <a class="cms-btn cms-btn-outline" href="homepage-mg.html"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a>
+                        <a class="cms-btn cms-btn-primary" href="homepage-banner-mg-add.html">+ Add New Banner</a>
                     </div>
                 </div>
-            </article>
-            <article class="banner-card">
-                <div class="banner-image banner-image-placeholder" role="img" aria-label="Banner Image">Banner Image</div>
-                <div class="banner-details">
-                    <h2>Founding Anniversary</h2>
-                    <p>Short banner description shown over the image.</p>
-                    <div class="banner-card-footer">
-                        <span class="banner-status">Active</span>
-                        <div class="banner-actions">
-                            <a class="banner-action edit-action" href="homepage-banner-mg-edit.html">Edit</a>
-                            <button class="banner-action delete-action" type="button">Delete</button>
-                        </div>
-                    </div>
-                </div>
-            </article>
-            <article class="banner-card">
-                <div class="banner-image banner-image-placeholder" role="img" aria-label="Banner Image">Banner Image</div>
-                <div class="banner-details">
-                    <h2>Research Congress 2026</h2>
-                    <p>Short banner description shown over the image.</p>
-                    <div class="banner-card-footer">
-                        <span class="banner-status">Active</span>
-                        <div class="banner-actions">
-                            <a class="banner-action edit-action" href="homepage-banner-mg-edit.html">Edit</a>
-                            <button class="banner-action delete-action" type="button">Delete</button>
-                        </div>
-                    </div>
-                </div>
-            </article>
-            <article class="banner-card">
-                <div class="banner-image banner-image-placeholder" role="img" aria-label="Banner Image">Banner Image</div>
-                <div class="banner-details">
-                    <h2>Scholarship Program</h2>
-                    <p>Short banner description shown over the image.</p>
-                    <div class="banner-card-footer">
-                        <span class="banner-status">Active</span>
-                        <div class="banner-actions">
-                            <a class="banner-action edit-action" href="homepage-banner-mg-edit.html">Edit</a>
-                            <button class="banner-action delete-action" type="button">Delete</button>
-                        </div>
-                    </div>
-                </div>
-            </article>
-        </section>
-    </main>
+                <div id="hpBanners" aria-live="polite"></div>
+            </main>
         </div>
     </div>
     <script src="../vendor/bootstrap/bootstrap.bundle.min.js"></script>
@@ -171,6 +116,8 @@
     <script src="../js/storage.js"></script>
     <script src="../js/ui.js"></script>
     <script src="../js/layout.js"></script>
+    <script src="../js/api-client.js"></script>
+    <script src="../js/homepage.js"></script>
 </body>
 
 </html>

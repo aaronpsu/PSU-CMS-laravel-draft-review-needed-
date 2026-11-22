@@ -9,11 +9,11 @@
     <link rel="stylesheet" href="../css/cms-base.css">
     <link rel="stylesheet" href="../css/cms-layout.css">
     <link rel="stylesheet" href="../css/cms-components.css">
-    <link rel="stylesheet" href="../css/feature-sec.css?v=2">
+    <link rel="stylesheet" href="../css/homepage.css?v=2">
     <title>Featured Sections | PSU Admin</title>
 </head>
 
-<body class="cms-body" data-page="homepage">
+<body class="cms-body" data-page="homepage" data-hp="featured">
     <div class="cms-shell">
         <aside class="cms-sidebar" id="cmsSidebar" aria-label="Sidebar">
             <a class="cms-brand" href="../index.html">
@@ -96,128 +96,23 @@
 
     <!-- CLICKABLE BUTTON : Add Featured Item -->
     <!-- CLICKABLE BUTTON : Featured Item Action -->
-    <main class="cms-content dashboard-content featured-content">
-        <div class="page-heading">
-            <div>
-                <h1>Featured Sections</h1>
-                <p class="page-description">Choose and arrange featured content on the homepage.</p>
-            </div>
-        </div>
-
-        <div class="featured-sections">
-            <section class="featured-section" aria-labelledby="featured-news-heading">
-                <div class="featured-section-header">
-                    <h2 id="featured-news-heading">Featured News</h2>
-                    <button class="featured-add-button" type="button"><span class="featured-add-icon" aria-hidden="true">+</span><span>Add</span></button>
+                <main class="cms-content" id="homepage-management">
+                <div class="hp-head">
+                    <div class="hp-head-copy">
+                        <h1 class="hp-title">Featured Sections</h1>
+                        <p class="hp-sub">Choose and arrange the news, announcements and events featured on the homepage.</p>
+                    </div>
+                    <div class="hp-actions"><a class="cms-btn cms-btn-outline" href="homepage-mg.html"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a></div>
                 </div>
-                <ul class="featured-list">
-                    <li class="featured-item">
-                        <span class="featured-drag-handle" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 5h14M3 10h14M3 15h14"></path></svg></span>
-                        <span class="featured-thumbnail" aria-hidden="true"></span>
-                        <div class="featured-item-copy"><strong>News item 1 title</strong><time datetime="2026-10-21">Oct 21, 2026</time></div>
-                        <div class="featured-item-actions"><button class="featured-control featured-reorder" type="button" data-move="up" aria-label="Move News item 1 title up" title="Move up"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button><button class="featured-control featured-reorder" type="button" data-move="down" aria-label="Move News item 1 title down" title="Move down"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m6-6-6 6-6-6"></path></svg></button><button class="featured-control" type="button">Edit</button><button class="featured-control featured-remove" type="button">Remove</button></div>
-                    </li>
-                    <li class="featured-item">
-                        <span class="featured-drag-handle" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 5h14M3 10h14M3 15h14"></path></svg></span>
-                        <span class="featured-thumbnail" aria-hidden="true"></span>
-                        <div class="featured-item-copy"><strong>News item 2 title</strong><time datetime="2026-10-22">Oct 22, 2026</time></div>
-                        <div class="featured-item-actions"><button class="featured-control featured-reorder" type="button" data-move="up" aria-label="Move News item 2 title up" title="Move up"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button><button class="featured-control featured-reorder" type="button" data-move="down" aria-label="Move News item 2 title down" title="Move down"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m6-6-6 6-6-6"></path></svg></button><button class="featured-control" type="button">Edit</button><button class="featured-control featured-remove" type="button">Remove</button></div>
-                    </li>
-                    <li class="featured-item">
-                        <span class="featured-drag-handle" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 5h14M3 10h14M3 15h14"></path></svg></span>
-                        <span class="featured-thumbnail" aria-hidden="true"></span>
-                        <div class="featured-item-copy"><strong>News item 3 title</strong><time datetime="2026-10-23">Oct 23, 2026</time></div>
-                        <div class="featured-item-actions"><button class="featured-control featured-reorder" type="button" data-move="up" aria-label="Move News item 3 title up" title="Move up"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button><button class="featured-control featured-reorder" type="button" data-move="down" aria-label="Move News item 3 title down" title="Move down"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m6-6-6 6-6-6"></path></svg></button><button class="featured-control" type="button">Edit</button><button class="featured-control featured-remove" type="button">Remove</button></div>
-                    </li>
-                </ul>
-            </section>
-
-            <section class="featured-section" aria-labelledby="featured-announcements-heading">
-                <div class="featured-section-header">
-                    <h2 id="featured-announcements-heading">Featured Announcements</h2>
-                    <button class="featured-add-button" type="button"><span class="featured-add-icon" aria-hidden="true">+</span><span>Add</span></button>
+                <div id="hpFeatured" aria-live="polite"></div>
+                <div class="hp-savebar" id="hpSaveBar" hidden>
+                    <span>You have unsaved changes.</span>
+                    <button class="cms-btn cms-btn-outline" type="button" id="hpDiscard">Discard</button>
+                    <button class="cms-btn cms-btn-primary" type="button" id="hpSave">Save Changes</button>
                 </div>
-                <ul class="featured-list">
-                    <li class="featured-item">
-                        <span class="featured-drag-handle" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 5h14M3 10h14M3 15h14"></path></svg></span>
-                        <span class="featured-thumbnail" aria-hidden="true"></span>
-                        <div class="featured-item-copy"><strong>Announcements item 1 title</strong><time datetime="2026-10-21">Oct 21, 2026</time></div>
-                        <div class="featured-item-actions"><button class="featured-control featured-reorder" type="button" data-move="up" aria-label="Move Announcements item 1 title up" title="Move up"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button><button class="featured-control featured-reorder" type="button" data-move="down" aria-label="Move Announcements item 1 title down" title="Move down"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m6-6-6 6-6-6"></path></svg></button><button class="featured-control" type="button">Edit</button><button class="featured-control featured-remove" type="button">Remove</button></div>
-                    </li>
-                    <li class="featured-item">
-                        <span class="featured-drag-handle" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 5h14M3 10h14M3 15h14"></path></svg></span>
-                        <span class="featured-thumbnail" aria-hidden="true"></span>
-                        <div class="featured-item-copy"><strong>Announcements item 2 title</strong><time datetime="2026-10-22">Oct 22, 2026</time></div>
-                        <div class="featured-item-actions"><button class="featured-control featured-reorder" type="button" data-move="up" aria-label="Move Announcements item 2 title up" title="Move up"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button><button class="featured-control featured-reorder" type="button" data-move="down" aria-label="Move Announcements item 2 title down" title="Move down"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m6-6-6 6-6-6"></path></svg></button><button class="featured-control" type="button">Edit</button><button class="featured-control featured-remove" type="button">Remove</button></div>
-                    </li>
-                    <li class="featured-item">
-                        <span class="featured-drag-handle" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 5h14M3 10h14M3 15h14"></path></svg></span>
-                        <span class="featured-thumbnail" aria-hidden="true"></span>
-                        <div class="featured-item-copy"><strong>Announcements item 3 title</strong><time datetime="2026-10-23">Oct 23, 2026</time></div>
-                        <div class="featured-item-actions"><button class="featured-control featured-reorder" type="button" data-move="up" aria-label="Move Announcements item 3 title up" title="Move up"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button><button class="featured-control featured-reorder" type="button" data-move="down" aria-label="Move Announcements item 3 title down" title="Move down"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m6-6-6 6-6-6"></path></svg></button><button class="featured-control" type="button">Edit</button><button class="featured-control featured-remove" type="button">Remove</button></div>
-                    </li>
-                </ul>
-            </section>
-
-            <section class="featured-section" aria-labelledby="featured-events-heading">
-                <div class="featured-section-header">
-                    <h2 id="featured-events-heading">Featured Events</h2>
-                    <button class="featured-add-button" type="button"><span class="featured-add-icon" aria-hidden="true">+</span><span>Add</span></button>
-                </div>
-                <ul class="featured-list">
-                    <li class="featured-item">
-                        <span class="featured-drag-handle" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 5h14M3 10h14M3 15h14"></path></svg></span>
-                        <span class="featured-thumbnail" aria-hidden="true"></span>
-                        <div class="featured-item-copy"><strong>Events item 1 title</strong><time datetime="2026-10-21">Oct 21, 2026</time></div>
-                        <div class="featured-item-actions"><button class="featured-control featured-reorder" type="button" data-move="up" aria-label="Move Events item 1 title up" title="Move up"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button><button class="featured-control featured-reorder" type="button" data-move="down" aria-label="Move Events item 1 title down" title="Move down"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m6-6-6 6-6-6"></path></svg></button><button class="featured-control" type="button">Edit</button><button class="featured-control featured-remove" type="button">Remove</button></div>
-                    </li>
-                    <li class="featured-item">
-                        <span class="featured-drag-handle" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 5h14M3 10h14M3 15h14"></path></svg></span>
-                        <span class="featured-thumbnail" aria-hidden="true"></span>
-                        <div class="featured-item-copy"><strong>Events item 2 title</strong><time datetime="2026-10-22">Oct 22, 2026</time></div>
-                        <div class="featured-item-actions"><button class="featured-control featured-reorder" type="button" data-move="up" aria-label="Move Events item 2 title up" title="Move up"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button><button class="featured-control featured-reorder" type="button" data-move="down" aria-label="Move Events item 2 title down" title="Move down"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m6-6-6 6-6-6"></path></svg></button><button class="featured-control" type="button">Edit</button><button class="featured-control featured-remove" type="button">Remove</button></div>
-                    </li>
-                    <li class="featured-item">
-                        <span class="featured-drag-handle" aria-hidden="true"><svg viewBox="0 0 20 20" focusable="false"><path d="M3 5h14M3 10h14M3 15h14"></path></svg></span>
-                        <span class="featured-thumbnail" aria-hidden="true"></span>
-                        <div class="featured-item-copy"><strong>Events item 3 title</strong><time datetime="2026-10-23">Oct 23, 2026</time></div>
-                        <div class="featured-item-actions"><button class="featured-control featured-reorder" type="button" data-move="up" aria-label="Move Events item 3 title up" title="Move up"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button><button class="featured-control featured-reorder" type="button" data-move="down" aria-label="Move Events item 3 title down" title="Move down"><svg class="reorder-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14m6-6-6 6-6-6"></path></svg></button><button class="featured-control" type="button">Edit</button><button class="featured-control featured-remove" type="button">Remove</button></div>
-                    </li>
-                </ul>
-            </section>
-        </div>
-    </main>
+            </main>
         </div>
     </div>
-    <script>
-        document.querySelectorAll('.featured-list').forEach(function(list) {
-            function updateMoveButtons() {
-                var items = Array.from(list.children);
-                items.forEach(function(item, index) {
-                    item.querySelector('[data-move="up"]').disabled = index === 0;
-                    item.querySelector('[data-move="down"]').disabled = index === items.length - 1;
-                });
-            }
-
-            list.addEventListener('click', function(event) {
-                var button = event.target.closest('button[data-move]');
-                if (!button) {
-                    return;
-                }
-
-                var item = button.closest('.featured-item');
-                if (button.dataset.move === 'up' && item.previousElementSibling) {
-                    list.insertBefore(item, item.previousElementSibling);
-                } else if (button.dataset.move === 'down' && item.nextElementSibling) {
-                    list.insertBefore(item.nextElementSibling, item);
-                }
-
-                updateMoveButtons();
-            });
-
-            updateMoveButtons();
-        });
-    </script>
     <script src="../vendor/bootstrap/bootstrap.bundle.min.js"></script>
     <script src="../js/config.js"></script>
     <script src="../js/seed-data.js"></script>
@@ -225,6 +120,8 @@
     <script src="../js/storage.js"></script>
     <script src="../js/ui.js"></script>
     <script src="../js/layout.js"></script>
+    <script src="../js/api-client.js"></script>
+    <script src="../js/homepage.js"></script>
 </body>
 
 </html>

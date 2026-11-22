@@ -9,11 +9,11 @@
     <link rel="stylesheet" href="../css/cms-base.css">
     <link rel="stylesheet" href="../css/cms-layout.css">
     <link rel="stylesheet" href="../css/cms-components.css">
-    <link rel="stylesheet" href="../css/banner-mg.css?v=20">
+    <link rel="stylesheet" href="../css/homepage.css?v=2">
     <title>Edit Banner | PSU Admin</title>
 </head>
 
-<body class="cms-body" data-page="homepage">
+<body class="cms-body" data-page="homepage" data-hp="banner-form">
     <div class="cms-shell">
         <aside class="cms-sidebar" id="cmsSidebar" aria-label="Sidebar">
             <a class="cms-brand" href="../index.html">
@@ -94,29 +94,33 @@
                 </div>
             </header>
 
-            <main class="cms-content">
-                <div class="cms-page-head">
-                    <div>
-                        <h1 class="cms-page-title">Edit Banner</h1>
-                        <p class="cms-page-sub">Set the banner image, text and display status.</p>
+                        <main class="cms-content" id="homepage-management">
+                <div class="hp-head">
+                    <div class="hp-head-copy">
+                        <h1 class="hp-title">Edit Banner</h1>
+                        <p class="hp-sub">Update the banner image, text and display status.</p>
                     </div>
+                    <div class="hp-actions"><a class="cms-btn cms-btn-outline" href="homepage-banner-mg.html"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a></div>
                 </div>
-
-                <form id="bannerForm">
-                    <section class="cms-card cms-form-card banner-form-card" aria-label="Banner details">
-                        <div class="cms-field">
-                            <span class="cms-label" id="bannerImageLabel">Banner Image</span>
+                <div id="bannerLoad" aria-live="polite"></div>
+                <form id="bannerForm" novalidate>
+                    <section class="cms-card cms-form-card hp-form-card" aria-label="Banner details">
+                        <div class="cms-field" id="bannerImageField">
+                            <span class="cms-label" id="bannerImageLabel">Banner Image <span class="cms-required">*</span></span>
                             <div class="cms-upload" role="group" aria-labelledby="bannerImageLabel">
-                                <div class="cms-upload-preview banner-image-preview" id="bannerImagePreview">Banner Image</div>
-                                <input class="cms-visually-hidden" type="file" id="bannerImage" accept="image/*">
-                                <button class="cms-btn banner-upload-btn" type="button" id="bannerUploadButton">Upload Image</button>
+                                <div class="cms-upload-preview" id="bannerImagePreview">Banner Image</div>
+                                <input class="cms-visually-hidden" type="file" id="bannerImage" accept="image/png,image/jpeg,image/webp,image/gif" tabindex="-1">
+                                <button class="cms-btn cms-btn-outline" type="button" id="bannerUploadButton">Upload Image</button>
                             </div>
+                            <p class="hp-hint">PNG, JPG, WEBP or GIF, up to 5 MB. A wide image (about 16:7) looks best.</p>
+                            <p class="cms-field-error" role="alert"></p>
                         </div>
 
-                        <div class="cms-form-row">
-                            <div class="cms-field">
-                                <label class="cms-label" for="bannerTitle">Banner Title</label>
-                                <input class="cms-input" id="bannerTitle" type="text" value="Enrollment Now Open">
+                        <div class="hp-fields">
+                            <div class="cms-field" id="bannerTitleField">
+                                <label class="cms-label" for="bannerTitle">Banner Title <span class="cms-required">*</span></label>
+                                <input class="cms-input" id="bannerTitle" type="text" maxlength="255" placeholder="Enter banner title" autocomplete="off">
+                                <p class="cms-field-error" role="alert"></p>
                             </div>
                             <div class="cms-field">
                                 <label class="cms-label" for="bannerStatus">Display Status</label>
@@ -125,32 +129,28 @@
                                     <option value="inactive">Inactive</option>
                                 </select>
                             </div>
-                        </div>
-
-                        <div class="cms-field">
-                            <label class="cms-label" for="bannerDescription">Banner Description</label>
-                            <textarea class="cms-textarea" id="bannerDescription" rows="4">Short banner description shown over the image.</textarea>
-                        </div>
-
-                        <div class="cms-form-row">
-                            <div class="cms-field">
-                                <label class="cms-label" for="bannerButtonLabel">Button Label</label>
-                                <input class="cms-input" id="bannerButtonLabel" type="text" value="Learn More">
+                            <div class="cms-field is-full">
+                                <label class="cms-label" for="bannerDescription">Banner Description</label>
+                                <textarea class="cms-textarea" id="bannerDescription" rows="4" maxlength="2000" placeholder="Short text shown over the image"></textarea>
                             </div>
                             <div class="cms-field">
+                                <label class="cms-label" for="bannerButtonLabel">Button Label</label>
+                                <input class="cms-input" id="bannerButtonLabel" type="text" maxlength="100" placeholder="e.g. Learn More" autocomplete="off">
+                            </div>
+                            <div class="cms-field" id="bannerLinkField">
                                 <label class="cms-label" for="bannerButtonLink">Button Link</label>
-                                <input class="cms-input" id="bannerButtonLink" type="url" value="https://www.psu.edu.ph/">
+                                <input class="cms-input" id="bannerButtonLink" type="text" maxlength="2048" placeholder="https://www.psu.edu.ph/" autocomplete="off">
+                                <p class="cms-field-error" role="alert"></p>
                             </div>
                         </div>
                     </section>
 
-                    <div class="cms-form-actions">
+                    <div class="hp-form-actions">
                         <a class="cms-btn cms-btn-outline" href="homepage-banner-mg.html">Cancel</a>
-                        <button class="cms-btn cms-btn-primary" type="button">Save Banner</button>
+                        <button class="cms-btn cms-btn-primary" type="submit" id="bannerSave">Save Banner</button>
                     </div>
                 </form>
             </main>
-
         </div>
     </div>
     <script src="../vendor/bootstrap/bootstrap.bundle.min.js"></script>
@@ -160,25 +160,8 @@
     <script src="../js/storage.js"></script>
     <script src="../js/ui.js"></script>
     <script src="../js/layout.js"></script>
-    <script>
-        var bannerImageInput = document.getElementById('bannerImage');
-        var bannerImagePreview = document.getElementById('bannerImagePreview');
-        document.getElementById('bannerUploadButton').addEventListener('click', function () {
-            bannerImageInput.click();
-        });
-        bannerImageInput.addEventListener('change', function () {
-            var file = bannerImageInput.files[0];
-            if (!file || !file.type || file.type.indexOf('image/') !== 0) return;
-            var reader = new FileReader();
-            reader.addEventListener('load', function () {
-                var image = document.createElement('img');
-                image.src = reader.result;
-                image.alt = 'Banner image preview';
-                bannerImagePreview.replaceChildren(image);
-            });
-            reader.readAsDataURL(file);
-        });
-    </script>
+    <script src="../js/api-client.js"></script>
+    <script src="../js/homepage.js"></script>
 </body>
 
 </html>

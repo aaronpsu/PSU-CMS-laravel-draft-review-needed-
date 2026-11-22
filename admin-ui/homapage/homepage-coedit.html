@@ -9,11 +9,11 @@
     <link rel="stylesheet" href="../css/cms-base.css">
     <link rel="stylesheet" href="../css/cms-layout.css">
     <link rel="stylesheet" href="../css/cms-components.css">
-    <link rel="stylesheet" href="../css/homepage-ce.css?v=26">
+    <link rel="stylesheet" href="../css/homepage.css?v=2">
     <title>Homepage Content Editor | PSU Admin</title>
 </head>
 
-<body class="cms-body" data-page="homepage">
+<body class="cms-body" data-page="homepage" data-hp="editor">
     <div class="cms-shell">
         <aside class="cms-sidebar" id="cmsSidebar" aria-label="Sidebar">
             <a class="cms-brand" href="../index.html">
@@ -98,98 +98,69 @@
     <!-- CLICKABLE BUTTON : Preview Website -->
     <!-- CLICKABLE BUTTON : Save Changes -->
 
-    <main class="cms-content dashboard-content" id="homepage-content-editor">
-        <div class="page-heading website-page-heading">
-            <div class="page-heading-copy">
-                <h1>Homepage Content Editor</h1>
-                <p class="page-description">Edit the text and sections shown on the homepage.</p>
-            </div>
-            <button class="back-button" type="button" onclick="window.history.back()">
-                <svg aria-hidden="true" viewBox="0 0 20 20" focusable="false">
-                    <path d="M12.5 4.5 7 10l5.5 5.5M7.5 10h9"></path>
-                </svg>
-                <span>Back</span>
-            </button>
-        </div>
-
-        <form class="homepage-editor-form">
-            <div class="editor-fields">
-                <div class="editor-field">
-                    <label for="welcome-heading">Welcome Heading</label>
-                    <input id="welcome-heading" name="welcome_heading" type="text" value="Welcome to Pangasinan State University">
-                </div>
-                <div class="editor-field">
-                    <label for="cta-button-label">Call-to-Action Button Label</label>
-                    <input id="cta-button-label" name="cta_button_label" type="text" value="Apply Now">
-                </div>
-
-                <div class="editor-field editor-field-full">
-                    <label for="university-introduction">University Introduction</label>
-                    <textarea id="university-introduction" name="university_introduction" rows="5">PSU is a premier state university in Pangasinan.</textarea>
-                </div>
-
-                <div class="editor-field editor-field-full">
-                    <label for="homepage-description">Homepage Description</label>
-                    <textarea id="homepage-description" name="homepage_description" rows="5">Official website of Pangasinan State University.</textarea>
-                </div>
-
-                <div class="editor-field">
-                    <label for="call-to-action-text">Call-to-Action Text</label>
-                    <input id="call-to-action-text" name="call_to_action_text" type="text" value="Begin your journey with PSU today.">
-                </div>
-                <div class="editor-field">
-                    <label for="featured-content">Featured Content</label>
-                    <select id="featured-content" name="featured_content">
-                        <option value="latest-news" selected>Latest News</option>
-                        <option value="latest-announcements">Latest Announcements</option>
-                        <option value="upcoming-events">Upcoming Events</option>
-                    </select>
-                </div>
-
-                <div class="editor-field editor-field-full">
-                    <label id="about-psu-label">About PSU Section</label>
-                    <div class="formatting-toolbar" role="toolbar" aria-label="About PSU text formatting">
-                        <button type="button" data-format="bold" aria-label="Bold"><strong>B</strong></button>
-                        <button type="button" data-format="italic" aria-label="Italic"><em>I</em></button>
-                        <button type="button" data-format="underline" aria-label="Underline"><u>U</u></button>
-                        <button type="button" data-format="insertUnorderedList" aria-label="Insert bulleted list">List</button>
-                        <button type="button" data-insert="createLink" aria-label="Insert link">Link</button>
-                        <button type="button" data-insert="insertImage" aria-label="Insert image">Image</button>
+                <main class="cms-content" id="homepage-management">
+                <div class="hp-head">
+                    <div class="hp-head-copy">
+                        <h1 class="hp-title">Homepage Content Editor</h1>
+                        <p class="hp-sub">Edit the text and sections shown on the homepage.</p>
                     </div>
-                    <div id="about-psu" class="rich-text-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="about-psu-label">Pangasinan State University is a multi-campus institution.</div>
+                    <div class="hp-actions"><a class="cms-btn cms-btn-outline" href="homepage-mg.html"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a></div>
                 </div>
-            </div>
+                <div id="editorLoad" aria-live="polite"></div>
+                <form id="homepageEditorForm" novalidate hidden>
+                    <section class="cms-card cms-form-card hp-form-card" aria-label="Homepage content">
+                        <div class="hp-fields">
+                            <div class="cms-field">
+                                <label class="cms-label" for="welcome-heading">Welcome Heading</label>
+                                <input class="cms-input" id="welcome-heading" name="welcome_heading" type="text" maxlength="255" placeholder="Welcome to Pangasinan State University">
+                            </div>
+                            <div class="cms-field">
+                                <label class="cms-label" for="cta-button-label">Call-to-Action Button Label</label>
+                                <input class="cms-input" id="cta-button-label" name="cta_button_label" type="text" maxlength="100" placeholder="Apply Now">
+                            </div>
+                            <div class="cms-field is-full">
+                                <label class="cms-label" for="university-introduction">University Introduction</label>
+                                <textarea class="cms-textarea" id="university-introduction" name="university_introduction" rows="5" placeholder="A short introduction to the university"></textarea>
+                            </div>
+                            <div class="cms-field is-full">
+                                <label class="cms-label" for="homepage-description">Homepage Description</label>
+                                <textarea class="cms-textarea" id="homepage-description" name="homepage_description" rows="5" placeholder="Official website of Pangasinan State University."></textarea>
+                            </div>
+                            <div class="cms-field">
+                                <label class="cms-label" for="call-to-action-text">Call-to-Action Text</label>
+                                <input class="cms-input" id="call-to-action-text" name="call_to_action_text" type="text" placeholder="Begin your journey with PSU today.">
+                            </div>
+                            <div class="cms-field">
+                                <label class="cms-label" for="featured-content">Featured Content</label>
+                                <select class="cms-input" id="featured-content" name="featured_content" data-cms-select data-block>
+                                    <option value="latest-news">Latest News</option>
+                                    <option value="latest-announcements">Latest Announcements</option>
+                                    <option value="upcoming-events">Upcoming Events</option>
+                                </select>
+                            </div>
+                            <div class="cms-field is-full">
+                                <span class="cms-label" id="about-psu-label">About PSU Section</span>
+                                <div class="hp-rte-toolbar" role="toolbar" aria-label="About PSU text formatting">
+                                    <button type="button" data-format="bold" aria-label="Bold"><strong>B</strong></button>
+                                    <button type="button" data-format="italic" aria-label="Italic"><em>I</em></button>
+                                    <button type="button" data-format="underline" aria-label="Underline"><u>U</u></button>
+                                    <button type="button" data-format="insertUnorderedList" aria-label="Bulleted list">List</button>
+                                    <button type="button" data-insert="createLink" aria-label="Insert link">Link</button>
+                                </div>
+                                <div id="about-psu" class="hp-rte" contenteditable="true" role="textbox" aria-multiline="true" aria-labelledby="about-psu-label" data-placeholder="Write about Pangasinan State University…"></div>
+                            </div>
+                        </div>
+                    </section>
 
-            <div class="editor-actions">
-                <a class="editor-button editor-button-cancel" href="homepage-mg.html">Cancel</a>
-                <button class="editor-button editor-button-preview" type="button">Preview Website</button>
-                <button class="editor-button editor-button-save" type="button">Save Changes</button>
-            </div>
-        </form>
-    </main>
+                    <div class="hp-form-actions">
+                        <a class="cms-btn cms-btn-outline" href="homepage-mg.html">Cancel</a>
+                        <button class="cms-btn cms-btn-outline" type="button" id="editorPreview">Preview Website</button>
+                        <button class="cms-btn cms-btn-primary" type="submit" id="editorSave">Save Changes</button>
+                    </div>
+                </form>
+            </main>
         </div>
     </div>
-    <script>
-        document.querySelectorAll('[data-format], [data-insert]').forEach(function(button) {
-            button.addEventListener('mousedown', function(event) {
-                event.preventDefault();
-            });
-            button.addEventListener('click', function() {
-                var command = button.dataset.format || button.dataset.insert;
-                var value = null;
-                if (command === 'createLink' || command === 'insertImage') {
-                    value = window.prompt(command === 'createLink' ? 'Enter the link URL:' : 'Enter the image URL:');
-                    if (!value || !value.trim()) {
-                        return;
-                    }
-                    value = value.trim();
-                }
-
-                document.execCommand(command, false, value);
-                document.getElementById('about-psu').focus();
-            });
-        });
-    </script>
     <script src="../vendor/bootstrap/bootstrap.bundle.min.js"></script>
     <script src="../js/config.js"></script>
     <script src="../js/seed-data.js"></script>
@@ -197,6 +168,8 @@
     <script src="../js/storage.js"></script>
     <script src="../js/ui.js"></script>
     <script src="../js/layout.js"></script>
+    <script src="../js/api-client.js"></script>
+    <script src="../js/homepage.js"></script>
 </body>
 
 </html>

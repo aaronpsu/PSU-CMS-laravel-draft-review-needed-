@@ -48,8 +48,8 @@ Route::middleware([LocalPrototypeOnly::class, 'web', 'auth:web', 'cms.json', 'cm
         Route::put('/settings', 'saveSettings');
         Route::get('/banners', 'getBanners');
         Route::post('/banners', 'addBanner');
-        Route::put('/banners/{id}', 'updateBanner');
-        Route::delete('/banners/{id}', 'deleteBanner');
+        Route::put('/banners/{id}', 'updateBanner')->whereNumber('id');
+        Route::delete('/banners/{id}', 'deleteBanner')->whereNumber('id');
         Route::get('/content/{type}', 'getContentOptions');
         Route::get('/featured', 'getFeaturedItems');
         Route::put('/featured', 'saveFeaturedItems');
@@ -136,5 +136,9 @@ Route::middleware([LocalPrototypeOnly::class, 'web', 'auth:web', 'cms.json', 'cm
 
 // Public Homepage data
 Route::get('/homepage/public', [HomepageManagementController::class, 'publicHomepage']);
+Route::get('/homepage/banners/{id}/image', [HomepageManagementController::class, 'bannerImage'])
+    ->whereNumber('id')
+    ->name('homepage.banner-image');
+
 
 

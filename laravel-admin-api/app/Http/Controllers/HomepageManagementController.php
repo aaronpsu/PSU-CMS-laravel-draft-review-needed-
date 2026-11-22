@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -30,7 +31,7 @@ class HomepageManagementController extends Controller
         return response()->json([
             'data' => [
                 'settings' => $this->settingsMap(),
-                'banners' => $this->bannerQuery()->get(),
+                'banners' => $this->bannerRows($this->bannerQuery()->get()),
                 'featured' => $this->featuredItems(),
             ],
         ]);
@@ -45,6 +46,17 @@ class HomepageManagementController extends Controller
     /** Save only the known Homepage Content Editor fields. */
     public function saveSettings(Request $request)
     {
+        // Check the raw input first: validate() silently drops keys it has no rule for.
+        $submitted = $request->input('settings');
+        if (is_array($submitted)) {
+            $unknownKeys = array_diff(array_keys($submitted), self::SETTING_KEYS);
+            if ($unknownKeys !== []) {
+                throw ValidationException::withMessages([
+                    'settings' => ['Unsupported Homepage setting: '.implode(', ', $unknownKeys)],
+                ]);
+            }
+        }
+
         $validated = $request->validate([
             'settings' => ['required', 'array', 'min:1'],
             'settings.welcome_heading' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -60,11 +72,9 @@ class HomepageManagementController extends Controller
         ]);
 
         $settings = $validated['settings'];
-        $unknownKeys = array_diff(array_keys($settings), self::SETTING_KEYS);
-        if ($unknownKeys !== []) {
-            throw ValidationException::withMessages([
-                'settings' => ['Unsupported Homepage setting: '.implode(', ', $unknownKeys)],
-            ]);
+
+        if (isset($settings['about_psu'])) {
+            $settings['about_psu'] = $this->sanitizeRichText((string) $settings['about_psu']);
         }
 
         DB::transaction(function () use ($settings) {
@@ -90,38 +100,46 @@ class HomepageManagementController extends Controller
     /** List banners for the Banner Management page. */
     public function getBanners()
     {
-        return response()->json(['data' => $this->bannerQuery()->get()]);
+        return response()->json(['data' => $this->bannerRows($this->bannerQuery()->get())]);
     }
 
-    /** Create a banner and store its image on Laravel's public disk. */
+    /**
+     * Create a banner. Mutations must be JSON (see CmsJsonMutations), so the
+     * image arrives as a base64 data URL, like the Media Library upload.
+     */
     public function addBanner(Request $request)
     {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'subtitle' => ['nullable', 'string'],
+            'subtitle' => ['nullable', 'string', 'max:2000'],
             'button_label' => ['nullable', 'string', 'max:100'],
-            'button_url' => ['nullable', 'string', 'max:2048'],
+            'button_url' => ['nullable', 'string', 'max:2048', $this->urlRule()],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
-            'image' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'image' => ['required', 'string', 'max:7500000'],
         ]);
 
-        $path = $request->file('image')->store('homepage/banners', 'public');
-        $id = DB::table('homepage_banners')->insertGetId([
-            'title' => $validated['title'],
-            'subtitle' => $validated['subtitle'] ?? null,
-            'image_path' => $path,
-            'button_label' => $validated['button_label'] ?? null,
-            'button_url' => $validated['button_url'] ?? null,
-            'sort_order' => $validated['sort_order'] ?? 0,
-            'is_active' => $validated['is_active'] ?? true,
-            'created_at' => now(),
-            'updated_at' => now(),
-        ], 'banner_id');
+        $path = $this->storeBannerImage($validated['image']);
+        try {
+            $id = DB::table('homepage_banners')->insertGetId([
+                'title' => trim($validated['title']),
+                'subtitle' => $this->blankToNull($validated['subtitle'] ?? null),
+                'image_path' => $path,
+                'button_label' => $this->blankToNull($validated['button_label'] ?? null),
+                'button_url' => $this->blankToNull($validated['button_url'] ?? null),
+                'sort_order' => $validated['sort_order'] ?? ((int) DB::table('homepage_banners')->max('sort_order') + 1),
+                'is_active' => $validated['is_active'] ?? true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ], 'banner_id');
+        } catch (\Throwable $exception) {
+            Storage::disk('public')->delete($path);
+            throw $exception;
+        }
 
         return response()->json([
             'message' => 'Banner created successfully.',
-            'data' => $this->bannerQuery()->where('banner_id', $id)->first(),
+            'data' => $this->bannerRow($this->bannerQuery()->where('banner_id', $id)->first()),
         ], 201);
     }
 
@@ -133,22 +151,38 @@ class HomepageManagementController extends Controller
 
         $validated = $request->validate([
             'title' => ['sometimes', 'required', 'string', 'max:255'],
-            'subtitle' => ['sometimes', 'nullable', 'string'],
+            'subtitle' => ['sometimes', 'nullable', 'string', 'max:2000'],
             'button_label' => ['sometimes', 'nullable', 'string', 'max:100'],
-            'button_url' => ['sometimes', 'nullable', 'string', 'max:2048'],
+            'button_url' => ['sometimes', 'nullable', 'string', 'max:2048', $this->urlRule()],
             'sort_order' => ['sometimes', 'integer', 'min:0'],
             'is_active' => ['sometimes', 'boolean'],
-            'image' => ['sometimes', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
+            'image' => ['sometimes', 'nullable', 'string', 'max:7500000'],
         ]);
 
+        $newImage = $validated['image'] ?? null;
         unset($validated['image']);
-        if ($request->hasFile('image')) {
-            $validated['image_path'] = $request->file('image')->store('homepage/banners', 'public');
+        foreach (['title', 'subtitle', 'button_label', 'button_url'] as $key) {
+            if (array_key_exists($key, $validated)) {
+                $validated[$key] = $this->blankToNull($validated[$key]);
+            }
+        }
+        if (array_key_exists('title', $validated) && $validated['title'] === null) {
+            throw ValidationException::withMessages(['title' => ['The title field is required.']]);
+        }
+        if ($newImage) {
+            $validated['image_path'] = $this->storeBannerImage($newImage);
         }
 
         if ($validated !== []) {
             $validated['updated_at'] = now();
-            DB::table('homepage_banners')->where('banner_id', $id)->update($validated);
+            try {
+                DB::table('homepage_banners')->where('banner_id', $id)->update($validated);
+            } catch (\Throwable $exception) {
+                if (isset($validated['image_path'])) {
+                    Storage::disk('public')->delete($validated['image_path']);
+                }
+                throw $exception;
+            }
         }
 
         if (isset($validated['image_path']) && $banner->image_path) {
@@ -157,7 +191,7 @@ class HomepageManagementController extends Controller
 
         return response()->json([
             'message' => 'Banner updated successfully.',
-            'data' => $this->bannerQuery()->where('banner_id', $id)->first(),
+            'data' => $this->bannerRow($this->bannerQuery()->where('banner_id', $id)->first()),
         ]);
     }
 
@@ -173,6 +207,29 @@ class HomepageManagementController extends Controller
         }
 
         return response()->json(['message' => 'Banner deleted successfully.']);
+    }
+
+    /** Public banner image (banners are public website content). */
+    public function bannerImage(int $id)
+    {
+        $banner = DB::table('homepage_banners')->where('banner_id', $id)->first(['image_path']);
+        abort_unless($banner && $banner->image_path && Storage::disk('public')->exists($banner->image_path), 404);
+
+        $stream = Storage::disk('public')->readStream($banner->image_path);
+        abort_unless(is_resource($stream), 404);
+
+        return response()->stream(static function () use ($stream): void {
+            try {
+                fpassthru($stream);
+            } finally {
+                fclose($stream);
+            }
+        }, 200, [
+            'Content-Type' => Storage::disk('public')->mimeType($banner->image_path) ?: 'application/octet-stream',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'public, max-age=300',
+            'Cross-Origin-Resource-Policy' => 'cross-origin',
+        ]);
     }
 
     /** List published content that can be selected for a featured section. */
@@ -257,10 +314,114 @@ class HomepageManagementController extends Controller
         return response()->json([
             'data' => [
                 'settings' => $this->settingsMap(),
-                'banners' => $this->bannerQuery()->where('is_active', true)->get(),
+                'banners' => $this->bannerRows($this->bannerQuery()->where('is_active', true)->get()),
                 'featured' => $this->featuredItems(true),
             ],
         ]);
+    }
+
+    private function bannerRows($rows)
+    {
+        return $rows->map(fn ($row) => $this->bannerRow($row))->values();
+    }
+
+    private function bannerRow(object $row): object
+    {
+        $row->is_active = (bool) $row->is_active;
+        $row->image_url = $row->image_path ? route('homepage.banner-image', ['id' => $row->banner_id]) : null;
+        unset($row->image_path);
+
+        return $row;
+    }
+
+    private function blankToNull(?string $value): ?string
+    {
+        $value = $value === null ? null : trim($value);
+
+        return $value === '' ? null : $value;
+    }
+
+    /** Allow only http(s) links, mailto links and site-relative paths. */
+    private function urlRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            $value = trim((string) $value);
+            if ($value !== '' && ! preg_match('#^(https?://[^\s]+|mailto:[^\s]+|/[^\s]*|\#[^\s]*)$#i', $value)) {
+                $fail('The button link must start with http://, https://, mailto:, or /.');
+            }
+        };
+    }
+
+    private function sanitizeRichText(string $html): string
+    {
+        $clean = preg_replace('#<(script|style|iframe|object|embed|template)\b.*?</\1\s*>#is', '', $html) ?? $html;
+        $clean = strip_tags($clean, '<p><br><strong><b><em><i><u><ul><ol><li><a><div>');
+        // Rebuild every <a> from scratch: keep only an http(s)/mailto href.
+        $clean = preg_replace_callback('/<a\b([^>]*)>/i', static function (array $m): string {
+            if (preg_match('/\bhref\s*=\s*(?:"([^"]*)"|\'([^\']*)\')/i', $m[1], $href)) {
+                $url = html_entity_decode(trim($href[1] !== '' ? $href[1] : ($href[2] ?? '')));
+                if (preg_match('#^(https?://[^\s<>"\']+|mailto:[^\s<>"\']+)$#i', $url)) {
+                    return '<a href="'.e($url).'" rel="noopener noreferrer">';
+                }
+            }
+
+            return '<a>';
+        }, $clean) ?? $clean;
+        // Drop every attribute from the remaining allowed tags.
+        $clean = preg_replace('/<(p|br|strong|b|em|i|u|ul|ol|li|div)\b[^>]*>/i', '<$1>', $clean) ?? $clean;
+
+        return trim($clean);
+    }
+
+    /** Validate, re-encode (strips payloads) and store a banner image; returns its public-disk path. */
+    private function storeBannerImage(string $dataUrl): string
+    {
+        if (! preg_match('#^data:image/(jpeg|png|gif|webp);base64,([A-Za-z0-9+/=]+)$#', $dataUrl, $matches)) {
+            throw ValidationException::withMessages(['image' => ['The banner image format is invalid.']]);
+        }
+        $bytes = base64_decode($matches[2], true);
+        if ($bytes === false || strlen($bytes) > 5 * 1024 * 1024) {
+            throw ValidationException::withMessages(['image' => ['The banner image is invalid or exceeds 5 MB.']]);
+        }
+        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+        $info = @getimagesizefromstring($bytes);
+        if (! in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)
+            || $info === false || $info[0] < 1 || $info[1] < 1 || $info[0] * $info[1] > 20000000) {
+            throw ValidationException::withMessages(['image' => ['The banner image type or dimensions are not allowed.']]);
+        }
+        abort_unless(function_exists('imagecreatefromstring') && function_exists('imagecreatetruecolor'), 503, 'Image processing support is unavailable on this server.');
+
+        $source = @imagecreatefromstring($bytes);
+        if ($source === false) {
+            throw ValidationException::withMessages(['image' => ['The banner image cannot be decoded.']]);
+        }
+        $width = imagesx($source);
+        $height = imagesy($source);
+        $scale = min(1, 1920 / max($width, $height));
+        $newWidth = max(1, (int) round($width * $scale));
+        $newHeight = max(1, (int) round($height * $scale));
+        $canvas = imagecreatetruecolor($newWidth, $newHeight);
+        imagealphablending($canvas, false);
+        imagesavealpha($canvas, true);
+        imagecopyresampled($canvas, $source, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+
+        ob_start();
+        match ($mime) {
+            'image/jpeg' => imagejpeg($canvas, null, 85),
+            'image/png' => imagepng($canvas),
+            'image/gif' => imagegif($canvas),
+            default => imagewebp($canvas, null, 85),
+        };
+        $encoded = ob_get_clean();
+        imagedestroy($canvas);
+        imagedestroy($source);
+        abort_unless(is_string($encoded) && $encoded !== '', 422, 'The banner image could not be processed.');
+
+        $extension = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp'][$mime];
+        $path = 'homepage/banners/'.Str::uuid().'.'.$extension;
+        abort_unless(Storage::disk('public')->put($path, $encoded), 500, 'The banner image could not be stored.');
+
+        return $path;
     }
 
     private function settingsMap(): array
