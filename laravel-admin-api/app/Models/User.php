@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable
 {
@@ -56,5 +57,21 @@ class User extends Authenticatable
     public function getAuthPassword()
     {
         return $this->password_hash;
+    }
+
+    public function getRoleAttribute($value): ?string
+    {
+        if (is_string($value) && $value !== '') {
+            return $value;
+        }
+
+        $roleName = DB::table('roles')->where('role_id', $this->attributes['role_id'] ?? null)->value('name');
+
+        return match (strtolower((string) $roleName)) {
+            'super administrator', 'administrator' => 'admin',
+            'editor' => 'editor',
+            'author' => 'author',
+            default => null,
+        };
     }
 }

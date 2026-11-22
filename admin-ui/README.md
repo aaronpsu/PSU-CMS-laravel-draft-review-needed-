@@ -4,9 +4,9 @@ Static HTML / CSS / vanilla JS / Bootstrap 5 screens for the PSU CMS admin panel
 News, Announcements, Events, Event Categories, Faculty & Staff Directory,
 Colleges, Departments, Academic Programs, and Users use the local Laravel API
 and the `psu_cms_admin` database from `psu_cms_admin.sql`. Documents, Media, Campuses, and
-News/Announcement Categories are also managed through Laravel. Their keyword
-and available dropdown filters run against that database. Other prototype screens
-still use `localStorage`.
+News/Announcement Categories, Homepage Management, and Contact & Feedback are
+also managed through Laravel. Their keyword and available dropdown filters run
+against that database. Other prototype screens still use `localStorage`.
 
 ## Run it
 Run the API from `laravel-admin-api` using `php artisan serve --host 127.0.0.1 --port 8001`.
@@ -35,6 +35,7 @@ for database setup and API details.
 | `faculty/`, `js/faculty.js` | Faculty & Staff Directory connected to the Laravel API |
 | `js/ui.js` | Toasts, confirm/detail modals, pagination, custom selects, highlight, image reader |
 | `js/layout.js` | Sidebar/header behavior, current-database notifications, and the configured public-site link |
+| `js/message-store.js`, `js/contact.js` | Database-backed Contact & Feedback submission and inbox actions |
 | `vendor/` | Bootstrap 5.3.3, Bootstrap Icons 1.11.3, Inter font — **local on purpose** (see CSP) |
 
 ## Why Bootstrap is vendored
@@ -54,10 +55,14 @@ the layout falls back to the original screenshots.
 ## Remaining prototype screens
 
 Global Search still searches browser-storage sample data rather than Laravel data.
-Dashboard, Homepage Management, and Contact & Feedback remain placeholders.
-General Settings and Website Information load from and save to the
-`site_settings` table; the public site's name, homepage description, and logo
-use those saved settings. Theme preferences remain local to the browser.
+Dashboard remains a placeholder. Homepage Management uses the `homepage_*`
+tables created by its Laravel migration. Contact & Feedback uses
+`contact_submissions` and `feedback_submissions`; public form submissions are
+server-validated and displayed in the admin inbox. General Settings and Website
+Information load from and save to the `site_settings` table; the public site's
+name and logo use those saved settings. The root public homepage also reads
+`homepage_settings`, active banners, and featured items from Homepage Management.
+Theme preferences remain local to the browser.
 Account sign-in and Security Settings use the local session-authenticated
 Laravel API.
 The shared header loads the signed-in user's notifications from the

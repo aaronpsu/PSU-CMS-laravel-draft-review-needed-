@@ -125,6 +125,51 @@ function public_asset_url(?string $path, string $folder): ?string
     return is_file($fullPath) ? $relative : null;
 }
 
+function public_homepage_settings(PDO $pdo): array
+{
+    $query = $pdo->query('SELECT setting_key, setting_value FROM homepage_settings');
+    return $query->fetchAll(PDO::FETCH_KEY_PAIR);
+}
+
+function public_homepage_banner_image(PDO $pdo, int $id): void
+{
+    $query = $pdo->prepare('SELECT image_path FROM homepage_banners WHERE banner_id = ? AND is_active = 1');
+    $query->execute([$id]);
+    $path = $query->fetchColumn();
+    $storageRoot = realpath(__DIR__ . '/laravel-admin-api/storage/app/public/homepage/banners');
+    if (!is_string($path) || !preg_match('#^homepage/banners/[a-f0-9-]+\.(?:jpg|png|gif|webp)$#iD', $path)
+        || $storageRoot === false) {
+        http_response_code(404);
+        exit;
+    }
+
+    $filePath = realpath($storageRoot . DIRECTORY_SEPARATOR . basename($path));
+    if ($filePath === false || !str_starts_with($filePath, $storageRoot . DIRECTORY_SEPARATOR) || !is_readable($filePath)) {
+        http_response_code(404);
+        exit;
+    }
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($filePath);
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) {
+        http_response_code(404);
+        exit;
+    }
+
+    header('Content-Type: ' . $mime);
+    header('Cache-Control: public, max-age=300');
+    header('X-Content-Type-Options: nosniff');
+    readfile($filePath);
+    exit;
+}
+
+$bannerId = filter_var($_GET['banner'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+if (array_key_exists('banner', $_GET)) {
+    if ($bannerId === false) {
+        http_response_code(404);
+        exit;
+    }
+    public_homepage_banner_image($pdo, (int) $bannerId);
+}
+
 $feedbackError='';
 if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['feedback'])) {
     check_csrf();
@@ -134,7 +179,7 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['feedback'])) {
     $message=trim((string)($_POST['message']??''));
     $errors=[];
     if($name===''||mb_strlen($name)>120) $errors[]='Enter a name (120 characters max).';
-    if(!filter_var($email,FILTER_VALIDATE_EMAIL)||mb_strlen($email)>190) $errors[]='Enter a valid email address.';
+    if(!filter_var($email,FILTER_VALIDATE_EMAIL)||mb_strlen($email)>150) $errors[]='Enter a valid email address.';
     if($subject===''||mb_strlen($subject)>220) $errors[]='Enter a subject (220 characters max).';
     if($message===''||mb_strlen($message)>5000) $errors[]='Enter a message (5000 characters max).';
     if($errors) {
@@ -163,7 +208,7 @@ if($_SERVER['REQUEST_METHOD']==='POST' && isset($_POST['feedback'])) {
         }
         if($allowed) {
             try {
-                $q=$pdo->prepare('INSERT INTO feedback(name,email,subject,message) VALUES(?,?,?,?)');
+                $q=$pdo->prepare("INSERT INTO contact_submissions(full_name,email,subject,message,status,received_at) VALUES(?,?,?,?, 'unread', NOW())");
                 $q->execute([$name,$email,$subject,$message]);
                 try {
                     $a=$pdo->prepare('INSERT INTO feedback_attempts(ip) VALUES (?)');
@@ -221,13 +266,73 @@ else {
     $q=$pdo->query("SELECT title, content FROM pages WHERE slug='homepage' AND status='published' LIMIT 1");
     $home=$q->fetch();
     $siteSettings=public_site_settings($pdo);
+    $homepageSettings=public_homepage_settings($pdo);
     $university=trim((string)($siteSettings['university_name']??''))?:'Pangasinan State University';
-    $homeDescription=trim(preg_replace('/\s+/', ' ', strip_tags((string)($home['content']??'')))??'');
+    $homeTitle=trim((string)($homepageSettings['welcome_heading']??''))?:trim((string)($home['title']??''))?:'Welcome to '.$university;
+    $homeDescription=trim(preg_replace('/\s+/', ' ', strip_tags((string)($homepageSettings['homepage_description']??'')))??'');
+    if($homeDescription==='') $homeDescription=trim(preg_replace('/\s+/', ' ', strip_tags((string)($home['content']??'')))??'');
     if($homeDescription==='') $homeDescription=trim((string)($siteSettings['website_description']??''))?:'Campus news, announcements, events, academic programs and community information in one place.';
-    echo '<section class="hero"><span class="eyebrow">'.h($university).' · URDANETA CITY CAMPUS</span><h1>'.h($home['title']??'Welcome to '.$university).'</h1><p>'.h($homeDescription).'</p><form class="search" method="get"><input name="q" placeholder="Search campus content" aria-label="Search campus content" maxlength="100"><button>Search</button></form></section>';
-    $rows=public_content_rows($pdo,'updates');
+    $callToAction=trim((string)($homepageSettings['call_to_action_text']??''));
+    $buttonLabel=trim((string)($homepageSettings['cta_button_label']??''));
+    echo '<section class="hero"><span class="eyebrow">'.h($university).' · URDANETA CITY CAMPUS</span><h1>'.h($homeTitle).'</h1><p>'.h($homeDescription).'</p>';
+    if($callToAction!=='') echo '<p>'.h($callToAction).'</p>';
+    if($buttonLabel!=='') echo '<p><a class="button" href="index.php?contact=1">'.h($buttonLabel).'</a></p>';
+    echo '<form class="search" method="get"><input name="q" placeholder="Search campus content" aria-label="Search campus content" maxlength="100"><button>Search</button></form></section>';
+
+    $universityIntroduction=trim(preg_replace('/\s+/', ' ', strip_tags((string)($homepageSettings['university_introduction']??'')))??'');
+    $aboutPsu=trim(preg_replace('/\s+/', ' ', strip_tags((string)($homepageSettings['about_psu']??'')))??'');
+    if($universityIntroduction!==''||$aboutPsu!=='') {
+        echo '<section class="home-introduction">';
+        if($universityIntroduction!=='') echo '<h2>Our University</h2><p>'.h($universityIntroduction).'</p>';
+        if($aboutPsu!=='') echo '<h2>About PSU</h2><p>'.h($aboutPsu).'</p>';
+        echo '</section>';
+    }
+
+    $bannerQuery=$pdo->query("SELECT banner_id, title, subtitle, button_label, button_url FROM homepage_banners WHERE is_active = 1 ORDER BY sort_order, banner_id");
+    $banners=$bannerQuery->fetchAll();
+    foreach($banners as $banner) {
+        echo '<section class="home-banner"><img src="index.php?banner='.(int)$banner['banner_id'].'" alt=""><div><h2>'.h($banner['title']).'</h2>';
+        if(!empty($banner['subtitle'])) echo '<p>'.h($banner['subtitle']).'</p>';
+        $bannerUrl=trim((string)($banner['button_url']??''));
+        if(!empty($banner['button_label'])&&preg_match('#^(https?://[^\s]+|mailto:[^\s]+|/[^\s]*|\#[^\s]*)$#i',$bannerUrl)) {
+            echo '<a class="button secondary" href="'.h($bannerUrl).'">'.h($banner['button_label']).'</a>';
+        }
+        echo '</div></section>';
+    }
+
+    $featuredQuery=$pdo->query("SELECT content_type, content_id, section_title FROM homepage_featured_items WHERE is_active = 1 ORDER BY sort_order, featured_item_id LIMIT 12");
+    $featuredGroups=[];
+    foreach($featuredQuery->fetchAll() as $featured) {
+        $item=public_content_item($pdo,(string)$featured['content_type'],(int)$featured['content_id']);
+        if($item) {
+            $sectionTitle=trim((string)($featured['section_title']??''))?:'Featured content';
+            $item['type']=$featured['content_type'];
+            $featuredGroups[$sectionTitle][]=$item;
+        }
+    }
+    foreach($featuredGroups as $sectionTitle=>$featuredItems) {
+        echo '<div class="section-head"><h2>'.h($sectionTitle).'</h2></div><div class="cards">';
+        foreach($featuredItems as $item) {
+            echo '<article class="card">';
+            $image=public_asset_url($item['image_path']??null,'media');
+            if($image) echo '<img src="'.h($image).'" alt="">';
+            echo '<div class="card-in"><span class="eyebrow">'.h($types[$item['type']]??$item['type']).'</span><h2><a href="index.php?type='.rawurlencode($item['type']).'&amp;item='.(int)$item['id'].'">'.h($item['title']).'</a></h2>';
+            $summary=trim(strip_tags((string)($item['summary']?:$item['body'])));
+            if($summary!=='') echo '<p>'.h(mb_substr($summary,0,170)).'</p>';
+            echo '</div></article>';
+        }
+        echo '</div>';
+    }
+
+    $featuredContent=$homepageSettings['featured_content']??'';
+    $updateType=['latest-news'=>'news','latest-announcements'=>'announcements','upcoming-events'=>'events'][$featuredContent]??'updates';
+    $rows=public_content_rows($pdo,$updateType);
+    if($featuredContent==='upcoming-events') {
+        $rows=array_values(array_filter($rows,static fn(array $row): bool => !empty($row['display_date'])&&strtotime((string)$row['display_date'])>=time()));
+    }
     $rows=array_slice($rows,0,9);
-    echo '<div class="section-head"><h2>Campus updates</h2><a href="index.php?type=news">Browse news</a></div>';
+    $browseType=$updateType==='updates'?'news':$updateType;
+    echo '<div id="campus-updates" class="section-head"><h2>'.($updateType==='updates'?'Campus updates':'Latest '.h($types[$updateType]??'content')).'</h2><a href="index.php?type='.h($browseType).'">Browse '.h(strtolower($types[$browseType]??'content')).'</a></div>';
 }
 echo '<div class="cards">';
 foreach($rows as $r) {

@@ -153,27 +153,32 @@
 
   /* ---------- actions ---------- */
   function markRead(m) {
-    if (store.setStatus(m.id, 'read')) { ui.toast('Message from ' + m.fullName + ' marked as read.', 'success'); render(); }
-    else ui.toast('The status could not be updated.', 'error');
+    store.setStatus(m.id, 'read')
+      .then(function () { ui.toast('Message from ' + m.fullName + ' marked as read.', 'success'); render(); })
+      .catch(function (error) { ui.toast(error.message, 'error'); });
   }
   function removeMessage(m) {
     store.confirmDelete()
       .then(function (yes) {
         if (!yes) return;
-        if (store.remove(m.id)) { ui.toast('Deleted.', 'success'); render(); }
-        else ui.toast('The record could not be deleted.', 'error');
+        store.remove(m.id).then(function () { ui.toast('Deleted.', 'success'); render(); })
+          .catch(function (error) { ui.toast(error.message, 'error'); });
       });
   }
 
   /* ---------- wiring ---------- */
-  setupFilter();
   searchInput.addEventListener('input', ui.debounce(function () { state.q = searchInput.value.trim(); state.page = 1; render(); }, 180));
   if (exportBtn) exportBtn.addEventListener('click', function () {
     if (!lastRows.length) { ui.toast('There are no records to export.', 'info'); return; }
     store.exportCsv(lastRows, mode.csvName);                      // only the currently filtered rows
     ui.toast('Exported ' + lastRows.length + ' record' + (lastRows.length === 1 ? '' : 's') + ' to CSV.', 'success');
   });
-  /* another tab changed the data */
-  window.addEventListener('storage', function (e) { if (e.key === cfg.storagePrefix + 'messages') render(); });
-  render();
+  store.load().then(function () {
+    setupFilter();
+    render();
+  }).catch(function (error) {
+    tableWrap.hidden = true;
+    emptyBox.hidden = false;
+    ui.renderEmpty(emptyBox, { title: 'Unable to load messages', text: error.message });
+  });
 })();

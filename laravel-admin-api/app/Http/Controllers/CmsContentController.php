@@ -54,7 +54,7 @@ class CmsContentController extends Controller
             ->leftJoin('media as m', 'm.media_id', '=', 'n.cover_media_id')
             ->select([
                 'n.news_id as id', 'n.title', 'n.author_name', 'u.full_name as creator_name',
-                'n.summary', 'n.content', 'n.status', 'n.published_at', 'n.campus_id',
+                'n.excerpt as summary', 'n.content', 'n.status', 'n.published_at', 'n.campus_id',
                 'c.name as campus_name', 'n.cover_media_id',
                 DB::raw('(SELECT nc.category_id FROM news_category_map ncm JOIN news_categories nc ON nc.category_id = ncm.category_id WHERE ncm.news_id = n.news_id ORDER BY nc.category_id LIMIT 1) as category_id'),
                 DB::raw('(SELECT nc.name FROM news_category_map ncm JOIN news_categories nc ON nc.category_id = ncm.category_id WHERE ncm.news_id = n.news_id ORDER BY nc.category_id LIMIT 1) as category_name'),
@@ -65,7 +65,7 @@ class CmsContentController extends Controller
             $query->where(function ($q) use ($term): void {
                 $q->where('n.title', 'like', $term)
                     ->orWhere('n.author_name', 'like', $term)
-                    ->orWhere('n.summary', 'like', $term)
+                    ->orWhere('n.excerpt', 'like', $term)
                     ->orWhere('n.content', 'like', $term)
                     ->orWhere('c.name', 'like', $term)
                     ->orWhereExists(function ($category) use ($term): void {
@@ -211,13 +211,13 @@ class CmsContentController extends Controller
     {
         $filters = $request->validate([
             'q'        => ['nullable', 'string', 'max:200'],
-            'category' => ['nullable', 'integer', 'exists:event_categories,id'],
+            'category' => ['nullable', 'integer', 'exists:event_categories,category_id'],
             'status'   => ['nullable', Rule::in(['draft', 'upcoming', 'ongoing', 'completed', 'cancelled', 'archived'])],
             'date'     => ['nullable', Rule::in(['7', '30', '90', 'year', 'past'])],
         ]);
 
         $query = DB::table('events as e')
-            ->join('event_categories as ec', 'ec.id', '=', 'e.category_id')
+            ->join('event_categories as ec', 'ec.category_id', '=', 'e.category_id')
             ->leftJoin('media as m', 'm.media_id', '=', 'e.cover_media_id')
             ->select([
                 'e.event_id as id', 'e.title', 'e.description', 'e.category_id as categoryId',
@@ -282,9 +282,21 @@ class CmsContentController extends Controller
         return response()->json(['deleted' => true]);
     }
 
-    public function eventCategoriesIndex(): JsonResponse
+    public function eventCategoriesIndex(Request $request): JsonResponse
     {
-        return response()->json($this->eventCategories());
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:200'],
+        ]);
+        $query = DB::table('event_categories');
+
+        if (! empty($filters['q'])) {
+            $term = '%' . $this->escapeLike($filters['q']) . '%';
+            $query->where(function ($q) use ($term): void {
+                $q->where('name', 'like', $term)->orWhere('description', 'like', $term);
+            });
+        }
+
+        return response()->json($query->orderBy('name')->get(['category_id as id', 'name', 'description']));
     }
 
     public function eventCategoryStore(Request $request): JsonResponse
@@ -328,6 +340,11 @@ class CmsContentController extends Controller
         DB::table('event_categories')->where('category_id', $id)->delete();
 
         return response()->json(['deleted' => true]);
+    }
+
+    private function eventCategories()
+    {
+        return DB::table('event_categories')->orderBy('name')->get(['category_id as id', 'name', 'description']);
     }
 
     public function newsCategoriesIndex(Request $request): JsonResponse
@@ -569,25 +586,29 @@ class CmsContentController extends Controller
             'role'   => ['nullable', 'string', 'max:50'],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
         ]);
-        $query = DB::table('users')->select([
-            'user_id as id', 'full_name as fullName', 'email', 'role', 'status',
-        ]);
+        $roleExpression = $this->normalizedUserRoleExpression();
+        $query = DB::table('users as u')
+            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->select([
+                'u.user_id as id', 'u.full_name as fullName', 'u.email',
+                DB::raw($roleExpression . ' as role'), 'u.status',
+            ]);
         if (! empty($filters['q'])) {
             $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
-                $q->where('full_name', 'like', $term)
-                    ->orWhere('email', 'like', $term)
-                    ->orWhere('role', 'like', $term);
+                $q->where('u.full_name', 'like', $term)
+                    ->orWhere('u.email', 'like', $term)
+                    ->orWhereRaw($this->normalizedUserRoleExpression() . ' LIKE ?', [$term]);
             });
         }
         if (! empty($filters['role'])) {
-            $query->where('role', $filters['role']);
+            $query->whereRaw($roleExpression . ' = ?', [$filters['role']]);
         }
         if (! empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+            $query->where('u.status', $filters['status']);
         }
 
-        return response()->json($query->orderBy('full_name')->orderBy('user_id')->limit(100)->get());
+        return response()->json($query->orderBy('u.full_name')->orderBy('u.user_id')->limit(100)->get());
     }
 
     public function userShow(int $id): JsonResponse
@@ -613,8 +634,16 @@ class CmsContentController extends Controller
         if (request()->user()?->user_id === $id) {
             return response()->json(['message' => 'You cannot delete the currently signed-in account.'], 422);
         }
-        $activeAdmins = DB::table('users')->where('role', 'admin')->where('status', 'active')->count();
-        $target = DB::table('users')->where('user_id', $id)->first(['role', 'status']);
+        $activeAdmins = DB::table('users as u')
+            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->where('u.status', 'active')
+            ->whereRaw($this->normalizedUserRoleExpression() . ' = ?', ['admin'])
+            ->count();
+        $target = DB::table('users as u')
+            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->where('u.user_id', $id)
+            ->selectRaw($this->normalizedUserRoleExpression() . ' as role, u.status')
+            ->first();
         if ($target && $target->role === 'admin' && $target->status === 'active' && $activeAdmins <= 1) {
             return response()->json(['message' => 'The final active administrator cannot be deleted.'], 422);
         }
@@ -625,10 +654,12 @@ class CmsContentController extends Controller
 
     public function userRolesIndex(): JsonResponse
     {
-        $roles = DB::table('users')
-            ->select('role as name', DB::raw('COUNT(*) as userCount'))
-            ->groupBy('role')
-            ->orderBy('role')
+        $roleExpression = $this->normalizedUserRoleExpression();
+        $roles = DB::table('users as u')
+            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->selectRaw($roleExpression . ' as name, COUNT(*) as userCount')
+            ->groupByRaw($roleExpression)
+            ->orderBy('name')
             ->get();
 
         return response()->json($roles);
@@ -642,13 +673,22 @@ class CmsContentController extends Controller
         ]);
         $oldName = trim($data['currentName']);
         $newName = trim($data['name']);
-        $existing = DB::table('users')->where('role', $oldName)->count();
+        $roleExpression = $this->normalizedUserRoleExpression();
+        $userIds = DB::table('users as u')
+            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->whereRaw($roleExpression . ' = ?', [$oldName])
+            ->pluck('u.user_id');
+        $existing = $userIds->count();
         abort_unless($existing > 0, 404, 'The role is no longer assigned to any users.');
-        if (strcasecmp($oldName, $newName) !== 0 && DB::table('users')->where('role', $newName)->exists()) {
+        $roleExists = DB::table('users as u')
+            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->whereRaw($roleExpression . ' = ?', [$newName])
+            ->exists();
+        if (strcasecmp($oldName, $newName) !== 0 && $roleExists) {
             return response()->json(['message' => 'A role with this name already exists.'], 422);
         }
-        DB::transaction(function () use ($oldName, $newName): void {
-            DB::table('users')->where('role', $oldName)->update(['role' => $newName, 'updated_at' => now()]);
+        DB::transaction(function () use ($userIds, $newName): void {
+            DB::table('users')->whereIn('user_id', $userIds)->update(['role' => $newName, 'updated_at' => now()]);
         });
 
         return response()->json(['name' => $newName, 'userCount' => $existing]);
@@ -1112,7 +1152,7 @@ class CmsContentController extends Controller
             $values     = [
                 'title'          => trim($data['title']),
                 'author_name'    => $data['author'] ?? null,
-                'summary'        => $data['shortDescription'] ?? null,
+                'excerpt'        => $data['shortDescription'] ?? null,
                 'content'        => $this->sanitizeRichText($data['content'] ?? ''),
                 'status'         => $data['status'],
                 'published_at'   => ($data['publishedAt'] ?? null) ?: ($data['status'] === 'published' ? now() : null),
@@ -1445,7 +1485,7 @@ class CmsContentController extends Controller
     {
         $data = $request->validate([
             'title'       => ['required', 'string', 'max:255'],
-            'categoryId'  => ['required', 'integer', 'exists:event_categories,id'],
+            'categoryId'  => ['required', 'integer', 'exists:event_categories,category_id'],
             'description' => ['nullable', 'string', 'max:2000000'],
             'venue'       => ['nullable', 'string', 'max:255'],
             'startDate'   => ['required', 'date'],
@@ -1603,11 +1643,6 @@ class CmsContentController extends Controller
         ];
     }
 
-    private function eventCategories()
-    {
-        return DB::table('event_categories')->orderBy('name')->get(['category_id as id', 'name', 'description']);
-    }
-
     private function eventCategoryJson(int $id): object
     {
         return DB::table('event_categories')->where('category_id', $id)->first(['category_id as id', 'name', 'description']);
@@ -1620,7 +1655,7 @@ class CmsContentController extends Controller
             ->leftJoin('users as u', 'u.user_id', '=', 'n.created_by')
             ->select([
                 'n.news_id as id', 'n.title', 'n.author_name', 'u.full_name as creator_name',
-                'n.summary', 'n.content', 'n.status', 'n.published_at', 'n.campus_id',
+                'n.excerpt as summary', 'n.content', 'n.status', 'n.published_at', 'n.campus_id',
                 'c.name as campus_name', 'n.cover_media_id',
                 DB::raw('(SELECT nc.category_id FROM news_category_map ncm JOIN news_categories nc ON nc.category_id = ncm.category_id WHERE ncm.news_id = n.news_id ORDER BY nc.category_id LIMIT 1) as category_id'),
                 DB::raw('(SELECT nc.name FROM news_category_map ncm JOIN news_categories nc ON nc.category_id = ncm.category_id WHERE ncm.news_id = n.news_id ORDER BY nc.category_id LIMIT 1) as category_name'),
@@ -1701,13 +1736,27 @@ class CmsContentController extends Controller
 
     private function findUser(int $id): object
     {
-        $row = DB::table('users')
-            ->select(['user_id as id', 'full_name as fullName', 'email', 'role', 'status'])
-            ->where('user_id', $id)
+        $row = DB::table('users as u')
+            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->select([
+                'u.user_id as id', 'u.full_name as fullName', 'u.email',
+                DB::raw($this->normalizedUserRoleExpression() . ' as role'), 'u.status',
+            ])
+            ->where('u.user_id', $id)
             ->first();
         abort_unless($row !== null, 404);
 
         return $row;
+    }
+
+    private function normalizedUserRoleExpression(): string
+    {
+        return "COALESCE(NULLIF(u.role, ''), CASE LOWER(COALESCE(r.name, '')) " .
+            "WHEN 'super administrator' THEN 'admin' " .
+            "WHEN 'administrator' THEN 'admin' " .
+            "WHEN 'editor' THEN 'editor' " .
+            "WHEN 'author' THEN 'author' " .
+            "ELSE LOWER(COALESCE(r.name, '')) END)";
     }
 
     private function findCollege(int $id): object
@@ -1802,7 +1851,7 @@ class CmsContentController extends Controller
 
     private function findEvent(int $id): object
     {
-        $row = DB::table('events as e')->join('event_categories as ec', 'ec.id', '=', 'e.category_id')
+        $row = DB::table('events as e')->join('event_categories as ec', 'ec.category_id', '=', 'e.category_id')
             ->select([
                 'e.event_id as id', 'e.title', 'e.description', 'e.category_id as categoryId',
                 'ec.name as categoryName', 'e.venue', 'e.start_at', 'e.end_at', 'e.organizer',
@@ -1931,20 +1980,9 @@ class CmsContentController extends Controller
         $name      = basename((string) ($attachment['name'] ?? 'attachment'));
         $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
         abort_unless(in_array($extension, ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg'], true), 422, 'The attachment file type is not allowed.');
-        $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) ?: 'application/octet-stream';
-        $allowedMime = [
-            'application/pdf',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'application/vnd.ms-powerpoint',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'text/plain',
-            'image/png',
-            'image/jpeg',
-        ];
-        abort_unless(in_array($mime, $allowedMime, true), 422, 'The attachment file type is not allowed.');
+        $detectedMime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes) ?: 'application/octet-stream';
+        $mime = $this->validatedDocumentMime($bytes, $extension, $detectedMime);
+        abort_unless($mime !== null, 422, 'The file contents do not match a supported document type.');
         $path = 'documents/' . Str::uuid() . '-' . Str::slug(pathinfo($name, PATHINFO_FILENAME)) . '.' . $extension;
         abort_unless(Storage::disk('local')->put($path, $bytes), 500, 'The uploaded document could not be stored.');
         if ($createdFiles !== null) {
@@ -1973,6 +2011,93 @@ class CmsContentController extends Controller
             ]);
         }
         return $documentId;
+    }
+
+    private function validatedDocumentMime(string $bytes, string $extension, string $detectedMime): ?string
+    {
+        $expectedMime = [
+            'pdf' => 'application/pdf',
+            'doc' => 'application/msword',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls' => 'application/vnd.ms-excel',
+            'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'ppt' => 'application/vnd.ms-powerpoint',
+            'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'txt' => 'text/plain',
+            'png' => 'image/png',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+        ][$extension] ?? null;
+        if ($expectedMime === null) {
+            return null;
+        }
+
+        $openXmlEntries = [
+            'docx' => ['word/document.xml', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml'],
+            'xlsx' => ['xl/workbook.xml', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml'],
+            'pptx' => ['ppt/presentation.xml', 'application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml'],
+        ];
+        if (isset($openXmlEntries[$extension])) {
+            if (! in_array($detectedMime, [$expectedMime, 'application/zip', 'application/x-zip', 'application/x-zip-compressed'], true)) {
+                return null;
+            }
+
+            return $this->hasOpenXmlStructure($bytes, ...$openXmlEntries[$extension]) ? $expectedMime : null;
+        }
+
+        if (in_array($extension, ['doc', 'xls', 'ppt'], true)) {
+            $oleSignature = "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1";
+            if (! str_starts_with($bytes, $oleSignature)
+                || ! in_array($detectedMime, [$expectedMime, 'application/x-ole-storage'], true)) {
+                return null;
+            }
+
+            return $expectedMime;
+        }
+
+        if ($detectedMime !== $expectedMime) {
+            return null;
+        }
+        if ($extension === 'pdf' && ! str_starts_with($bytes, '%PDF-')) {
+            return null;
+        }
+        if (in_array($extension, ['png', 'jpg', 'jpeg'], true) && @getimagesizefromstring($bytes) === false) {
+            return null;
+        }
+
+        return $expectedMime;
+    }
+
+    private function hasOpenXmlStructure(string $bytes, string $requiredEntry, string $requiredContentType): bool
+    {
+        abort_unless(class_exists(\ZipArchive::class), 503, 'ZIP support is required to validate Office Open XML documents.');
+        $temporaryPath = tempnam(sys_get_temp_dir(), 'cms-openxml-');
+        abort_unless($temporaryPath !== false, 500, 'A temporary file could not be created to validate the document.');
+
+        try {
+            abort_unless(file_put_contents($temporaryPath, $bytes) === strlen($bytes), 500, 'The document could not be prepared for validation.');
+            $archive = new \ZipArchive();
+            if ($archive->open($temporaryPath, \ZipArchive::RDONLY) !== true) {
+                return false;
+            }
+
+            try {
+                $contentTypesStat = $archive->statName('[Content_Types].xml');
+                if (! is_array($contentTypesStat) || ($contentTypesStat['size'] ?? PHP_INT_MAX) > 65536
+                    || $archive->locateName($requiredEntry) === false) {
+                    return false;
+                }
+                $contentTypes = $archive->getFromName('[Content_Types].xml');
+
+                return is_string($contentTypes) && str_contains($contentTypes, $requiredContentType);
+            } finally {
+                $archive->close();
+            }
+        } finally {
+            if (is_file($temporaryPath) && ! unlink($temporaryPath)) {
+                throw new \RuntimeException('The temporary document validation file could not be removed.');
+            }
+        }
     }
 
     private function storedFileResponse(string $path, ?string $mime, ?string $name, bool $download = true): Response

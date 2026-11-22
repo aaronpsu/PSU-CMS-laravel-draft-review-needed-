@@ -76,6 +76,9 @@ return new class extends Migration
         DB::statement("UPDATE documents d JOIN document_versions v ON v.document_id = d.document_id SET d.file_name = COALESCE(d.file_name, v.file_name), d.file_path = COALESCE(d.file_path, v.file_path), d.mime_type = COALESCE(d.mime_type, v.file_type), d.file_size = COALESCE(d.file_size, v.file_size_kb * 1024)");
 
         Schema::table('announcements', function (Blueprint $table): void {
+            if (! Schema::hasColumn('announcements', 'category_id')) {
+                $table->unsignedInteger('category_id')->nullable()->after('title');
+            }
             if (! Schema::hasColumn('announcements', 'attachment_document_id')) {
                 $table->unsignedInteger('attachment_document_id')->nullable()->after('expires_at');
             }
@@ -83,6 +86,9 @@ return new class extends Migration
                 $table->string('author_name', 150)->nullable()->after('title');
             }
         });
+        if (Schema::hasTable('announcement_category_map')) {
+            DB::statement("UPDATE announcements a JOIN announcement_category_map acm ON acm.announcement_id = a.announcement_id SET a.category_id = acm.category_id WHERE a.category_id IS NULL");
+        }
         DB::statement("UPDATE announcements a LEFT JOIN content_attachments ca ON ca.announcement_id = a.announcement_id SET a.attachment_document_id = ca.document_id");
 
         Schema::table('event_categories', function (Blueprint $table): void {
@@ -90,7 +96,9 @@ return new class extends Migration
                 $table->unsignedInteger('id')->nullable()->after('category_id');
             }
         });
-        DB::statement("UPDATE event_categories SET id = category_id WHERE id IS NULL");
+        if (Schema::hasColumn('event_categories', 'category_id')) {
+            DB::statement("UPDATE event_categories SET id = category_id WHERE id IS NULL");
+        }
     }
 
     public function down(): void

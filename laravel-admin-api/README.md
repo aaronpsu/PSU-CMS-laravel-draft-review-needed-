@@ -1,6 +1,6 @@
 ## PSU CMS local API
 
-This Laravel API connects the News, Announcements, Events, Event Categories, News/Announcement Categories, Campuses, Colleges, Departments, Academic Programs, Users/User Roles, Document Library, Media Library, and Faculty & Staff Directory screens to the `psu_cms_admin` database defined in `psu_cms_admin.sql`. Search, filters, and CRUD actions for those screens use MySQL.
+This Laravel API connects the News, Announcements, Events, Event Categories, News/Announcement Categories, Homepage Management, Contact & Feedback, Campuses, Colleges, Departments, Academic Programs, Users/User Roles, Document Library, Media Library, and Faculty & Staff Directory screens to the `psu_cms_admin` database defined in `psu_cms_admin.sql`. Search, filters, and CRUD actions for those screens use MySQL.
 
 ### Setup
 
@@ -15,7 +15,7 @@ Admin API routes are restricted to loopback requests in the `local` or `testing`
 
 Back up the database before running migrations. The initial Laravel migration preserves pre-existing `users` and `password_reset_tokens` tables and does not drop them on rollback; it creates those tables only when absent. The compatibility migration adapts the imported schema for the admin API; it does not reset tables. Use an application-specific database account with only required privileges.
 
-Session cookies are `HttpOnly` and `SameSite=Lax`; secure cookies default on in production/staging and off in local development so HTTP localhost sessions work. Image uploads require GD, are dimension-limited, and are decoded and re-encoded before storage. Document uploads are limited to 300 KB. Failed record transactions remove newly stored files.
+Session cookies are `HttpOnly` and `SameSite=Lax`; secure cookies default on in production/staging and off in local development so HTTP localhost sessions work. Image uploads require GD, are dimension-limited, and are decoded and re-encoded before storage. Document uploads are limited to 300 KB; file contents are checked against the selected extension, and Office Open XML packages are validated using PHP ZIP support before they are stored privately. Failed record transactions remove newly stored files.
 
 The root PHP site rejects non-local requests when its ignored `config.php` uses the MySQL `root` account or a blank database password. Replace those local credentials with a dedicated account before allowing non-local access; do not commit or share the local config file.
 
@@ -27,7 +27,7 @@ The test suite can run with `php artisan test` from this directory. Live databas
 - Announcements: keyword, category, status, date, and campus filters; create, edit, view, and delete.
 - Events: keyword, category, status, and date filters; create, edit, view, and delete.
 - Event Categories: create, rename, and delete categories used by Events.
-- News and Announcement Categories: search, create, rename, and delete; deletion is blocked while content uses a category.
+- News and Announcement Categories: separate tables are intentional. News uses `news_category_map`; Announcements use their own `category_id` foreign key. Deletion is blocked while content uses a category.
 - Campuses: search, status filter, create, edit, and delete; deletion is blocked while News or Announcements refer to the campus.
 - Document Library: search, upload (up to 300 KB), rename, download, and delete; deletion is blocked while an announcement uses the document.
 - Media Library: search, image upload (up to 5 MB), edit alt text, preview, and delete; deletion is blocked while News, Events, or Colleges reference the image.
@@ -36,7 +36,9 @@ The test suite can run with `php artisan test` from this directory. Live databas
 - Colleges: keyword and status filters; create, edit, view, and delete. Deletion is blocked while departments or programs reference the college.
 - Academic Programs: keyword, college, degree-level, and status filters; create, edit, view, and delete. A program's department must belong to its selected college.
 - Users: keyword, role, and status filters; create, edit, view, and delete. New passwords are hashed by Laravel; existing passwords are never returned by the API.
-- User Roles: role labels and user counts derived from `users.role`; rename applies to all users assigned that role. Independent roles and permissions are not in the schema.
+- User Roles: role labels and user counts come from assigned users; rename applies to all users assigned that label. The API does not expose permission configuration.
+- Homepage Management: banner images, homepage content, and featured items use the `homepage_*` tables from the homepage migration.
+- Contact & Feedback: the public form writes to `contact_submissions` or `feedback_submissions` with server-side validation and throttling; the admin inbox reads, updates, replies to, and deletes those records.
 - General Settings and Website Information: read and update supported keys in `site_settings`; website identity, description, and uploaded logo are reflected on the root public site.
 
 ### Schema limitations
@@ -44,7 +46,7 @@ The test suite can run with `php artisan test` from this directory. Live databas
 - News and Announcements support `draft`, `published`, and `archived`; News `pending review` is not present in the schema.
 - Announcements have no author-name field; the schema only permits an optional `created_by` user reference.
 - Event form actions create `draft` or `published` records. The schema also has `cancelled`, `completed`, and `archived` states, but the prototype has no controls to set those states.
-- `users.role` is a plain label, not a permissions model; there is no roles table, username, last-login field, or user profile image field. API authorization uses only the `admin` and `editor` labels and is not a substitute for a production permissions model.
+- `users.role_id` references `roles`; initial administrator setup stores that foreign key without a duplicate text role. The nullable `users.role` compatibility label remains for existing users and management screens. API authorization is still limited to `admin` and `editor` behavior and is not a production permissions model.
 - The `notifications` table stores per-user alerts. The admin header loads up to 20 newest alerts for the signed-in user and displays the unread count; selecting an unread alert marks it as read.
 - Site settings are restricted to the keys represented by the General Settings and Website Information forms. Logo uploads are stored in the shared Media table and served by the root site's `media.php` endpoint.
 - The SQL seed users contain demo values in `password_hash`; they are not usable password hashes. If no active administrator exists, open the sign-in page and use the **Create Initial Administrator** form. The setup endpoint is available only on loopback and refuses to run after an active administrator exists. The local API provides session-based sign-in but is not suitable for production use.

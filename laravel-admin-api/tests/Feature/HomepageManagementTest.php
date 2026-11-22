@@ -50,7 +50,7 @@ class HomepageManagementTest extends TestCase
         Schema::create('news', function (Blueprint $table): void {
             $table->increments('news_id');
             $table->string('title');
-            $table->text('summary')->nullable();
+            $table->text('excerpt')->nullable();
             $table->string('status')->default('draft');
             $table->timestamp('published_at')->nullable();
         });
@@ -167,6 +167,16 @@ class HomepageManagementTest extends TestCase
 
         $this->getJson('/api/homepage/public')->assertOk()
             ->assertJsonCount(1, 'data.banners')->assertJsonPath('data.banners.0.title', 'Shown');
+    }
+
+    public function test_homepage_migration_accepts_tables_already_created_by_the_sql_dump(): void
+    {
+        $migration = require database_path('migrations/2026_11_20_144308_create_homepage_management_tables.php');
+        $migration->up();
+
+        $this->assertTrue(Schema::hasTable('homepage_settings'));
+        $this->assertTrue(Schema::hasTable('homepage_banners'));
+        $this->assertTrue(Schema::hasTable('homepage_featured_items'));
     }
 
     private function signInAsAdmin(): string

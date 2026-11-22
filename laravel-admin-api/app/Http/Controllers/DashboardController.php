@@ -10,9 +10,15 @@ use Illuminate\Support\Facades\DB;
  * GET /api/dashboard
  *
  * Read-only aggregates for the admin dashboard. All figures come from cms_db;
+<<<<<<< HEAD
  * nothing is cached or invented. Targets the psu_cms_admin schema. Nothing writes
  * to activity_logs yet, so "recent activity" is derived from created_at/updated_at
  * and created_by (see recentActivity()).
+=======
+ * nothing is cached or invented. The schema has no audit-log table, so "recent
+ * activity" is derived from created_at/updated_at and the available creator
+ * references in the PSU schema.
+>>>>>>> baebe517c5a8372fbe02ff7bf16ebdc652c8454a
  */
 class DashboardController extends Controller
 {
@@ -138,11 +144,19 @@ class DashboardController extends Controller
         // psu_cms_admin has no updated_by column and no audit rows are written to
         // activity_logs, so the actor is the record's creator (created_by).
         $sources = [
+<<<<<<< HEAD
             ['news', 'title', 'news', 't.created_by', 't.status', 't.updated_at'],
             ['announcements', 'title', 'announcement', 't.created_by', 't.status', 't.updated_at'],
             ['events', 'title', 'event', 't.created_by', 't.status', 't.updated_at'],
             ['faculty_staff', "TRIM(CONCAT_WS(' ', t.first_name, t.last_name))", 'personnel', 'NULL', 'NULL', 't.updated_at'],
             ['documents', 'COALESCE(t.title, t.file_name)', 'document', 't.created_by', 'NULL', 't.created_at'],
+=======
+            ['news', 'news_id', 'title', 'news', 't.created_by', 't.status', 't.updated_at'],
+            ['announcements', 'announcement_id', 'title', 'announcement', 't.created_by', 't.status', 't.updated_at'],
+            ['events', 'event_id', 'title', 'event', 't.created_by', 't.status', 't.updated_at'],
+            ['faculty_staff', 'faculty_id', "CONCAT_WS(' ', NULLIF(t.first_name, ''), NULLIF(t.middle_name, ''), NULLIF(t.last_name, ''))", 'personnel', 'NULL', 't.status', 't.updated_at'],
+            ['documents', 'document_id', 'COALESCE(t.title, t.file_name)', 'document', 't.created_by', 'NULL', 't.created_at'],
+>>>>>>> baebe517c5a8372fbe02ff7bf16ebdc652c8454a
         ];
 
         $union = null;

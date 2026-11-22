@@ -70,3 +70,14 @@ button:hover,.button:hover{background:#092878}
 
 /* Admin list pagination */
 .pagination{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0}.pagination a{padding:6px 12px;border:1px solid var(--line);border-radius:6px;font-size:.85rem;background:#fff}.pagination a.active{background:#1239a5;border-color:#1239a5;color:#fff;font-weight:700}.pagination a:hover{border-color:#1239a5;text-decoration:none}
+
+/* Public homepage content managed by the CMS */
+.home-introduction{margin:0 0 32px;padding:24px 28px;background:#fff;border:1px solid var(--line);border-radius:12px}
+.home-introduction h2{margin:0 0 8px;color:#102d85}
+.home-introduction p{margin:0 0 18px;color:var(--muted)}
+.home-introduction p:last-child{margin-bottom:0}
+.home-banner{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:center;gap:28px;margin:24px 0;padding:16px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 5px 20px #183a3010}
+.home-banner img{width:100%;height:280px;object-fit:cover;border-radius:9px;background:var(--pale)}
+.home-banner h2{margin:0 0 8px;color:#102d85}
+.home-banner p{color:var(--muted)}
+@media(max-width:700px){.home-banner{grid-template-columns:1fr;gap:12px}.home-banner img{height:220px}.home-introduction{padding:20px}}

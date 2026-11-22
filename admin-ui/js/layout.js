@@ -306,7 +306,6 @@ CMS.layout = (function () {
       settings: '../system/system-gen.html',
       'general-settings': '../system/system-gen.html',
       'website-information': '../system/system-web-info.html',
-      'website-layout': '../settings/theme-settings.html',
       appearance: '../settings/theme-settings.html'
     };
     [].forEach.call(document.querySelectorAll('.cms-nav-link[data-pending]'), function (link) {
@@ -317,19 +316,119 @@ CMS.layout = (function () {
       }
     });
 
+    var settingsLink = document.querySelector('.cms-sidebar .cms-nav-link[data-nav="settings"]');
+    if (settingsLink && !settingsLink.closest('.cms-nav-group')) {
+      var settingsGroup = document.createElement('div');
+      settingsGroup.className = 'cms-nav-group';
+      settingsGroup.dataset.group = 'settings';
+      settingsGroup.dataset.generated = 'true';
+
+      var settingsToggle = document.createElement('button');
+      settingsToggle.type = 'button';
+      settingsToggle.className = 'cms-nav-link cms-nav-toggle';
+      settingsToggle.setAttribute('aria-expanded', 'false');
+      settingsToggle.setAttribute('aria-controls', 'subnav-settings');
+      while (settingsLink.firstChild) settingsToggle.appendChild(settingsLink.firstChild);
+
+      var settingsSubnav = document.createElement('div');
+      settingsSubnav.className = 'cms-subnav';
+      settingsSubnav.id = 'subnav-settings';
+      settingsGroup.appendChild(settingsToggle);
+      settingsGroup.appendChild(settingsSubnav);
+      settingsLink.parentNode.replaceChild(settingsGroup, settingsLink);
+    }
+
+    var facultyLink = document.querySelector('.cms-sidebar .cms-nav-link[data-nav="faculty"]');
+    var mainNavLabel = [].filter.call(document.querySelectorAll('.cms-sidebar .cms-nav-label'), function (label) {
+      return label.textContent.trim() === 'Main';
+    })[0];
+    if (facultyLink) {
+      var caret = facultyLink.querySelector('.cms-nav-caret');
+      if (caret) caret.remove();
+      if (mainNavLabel) {
+        var dashboardLink = mainNavLabel.nextElementSibling;
+        var insertAfter = dashboardLink && dashboardLink.getAttribute('data-nav') === 'dashboard' ? dashboardLink : mainNavLabel;
+        insertAfter.parentNode.insertBefore(facultyLink, insertAfter.nextSibling);
+      }
+    }
+
+    var settingsGroupElement = document.querySelector('.cms-nav-group[data-group="settings"]');
+    var settingsSubnavElement = settingsGroupElement && settingsGroupElement.querySelector('.cms-subnav');
+    var appearanceGroup = document.querySelector('.cms-nav-group[data-group="appearance"]');
+    if (settingsSubnavElement && appearanceGroup) {
+      [].forEach.call(appearanceGroup.querySelectorAll('.cms-subnav .cms-nav-link'), function (link) {
+        settingsSubnavElement.appendChild(link);
+      });
+      appearanceGroup.remove();
+    }
+
+    var appearanceLink = document.querySelector('.cms-sidebar .cms-nav-link[data-nav="appearance"]');
+    if (settingsSubnavElement && appearanceLink) {
+      var appearanceCaret = appearanceLink.querySelector('.cms-nav-caret');
+      if (appearanceCaret) appearanceCaret.remove();
+      appearanceLink.setAttribute('data-nav', 'theme-settings');
+      appearanceLink.href = new URL('../settings/theme-settings.html', window.location.href).href;
+      appearanceLink.removeAttribute('data-pending');
+      var appearanceText = appearanceLink.querySelector('.cms-nav-text');
+      if (appearanceText) appearanceText.textContent = 'Theme Settings';
+      settingsSubnavElement.appendChild(appearanceLink);
+    }
+
+    var settingsToggleElement = settingsGroupElement && settingsGroupElement.querySelector('.cms-nav-toggle');
+    if (settingsToggleElement) {
+      if (!settingsToggleElement.querySelector('.bi')) {
+        settingsToggleElement.insertBefore(CMS.ui.el('i', { class: 'bi bi-sliders', 'aria-hidden': 'true' }), settingsToggleElement.firstChild);
+      }
+      if (!settingsToggleElement.querySelector('.cms-nav-caret')) {
+        settingsToggleElement.appendChild(CMS.ui.el('span', { class: 'cms-nav-caret', 'aria-hidden': 'true' }));
+      }
+    }
+
+    var subnavIcons = {
+      'general-settings': 'gear',
+      'website-information': 'globe',
+      'theme-settings': 'palette',
+      campuses: 'geo-alt',
+      'content-categories': 'tags',
+      'account-settings': 'person-gear',
+      'security-settings': 'shield-lock',
+      forms: 'ui-checks',
+      'website-layout': 'columns-gap'
+    };
     function addSubnavLink(groupName, label, page, href) {
       var subnav = document.querySelector('.cms-nav-group[data-group="' + groupName + '"] .cms-subnav');
       if (!subnav || subnav.querySelector('.cms-nav-link[data-nav="' + page + '"]')) return;
       subnav.appendChild(CMS.ui.el('a', {
         class: 'cms-nav-link', href: new URL(href, window.location.href).href, 'data-nav': page
-      }, [CMS.ui.el('span', { class: 'cms-nav-text', text: label })]));
+      }, [
+        CMS.ui.el('i', { class: 'bi bi-' + (subnavIcons[page] || 'gear'), 'aria-hidden': 'true' }),
+        CMS.ui.el('span', { class: 'cms-nav-text', text: label })
+      ]));
     }
 
+    addSubnavLink('settings', 'General Settings', 'general-settings', '../system/system-gen.html');
+    addSubnavLink('settings', 'Website Information', 'website-information', '../system/system-web-info.html');
+    addSubnavLink('settings', 'Theme Settings', 'theme-settings', '../settings/theme-settings.html');
     addSubnavLink('news', 'News & Announcement Categories', 'content-categories', '../categories/content-categories.html');
     addSubnavLink('university', 'Campuses', 'campuses', '../campuses/campuses.html');
     addSubnavLink('settings', 'Account Settings', 'account-settings', '../settings/account-settings.html');
     addSubnavLink('settings', 'Security Settings', 'security-settings', '../settings/security-settings.html');
     addSubnavLink('settings', 'Forms', 'forms', '../contact/contact-form.html');
+    if (settingsSubnavElement) {
+      [].forEach.call(settingsSubnavElement.querySelectorAll('.cms-nav-link'), function (link) {
+        if (link.querySelector('.bi')) return;
+        var icon = subnavIcons[link.getAttribute('data-nav')] || 'gear';
+        link.insertBefore(CMS.ui.el('i', { class: 'bi bi-' + icon, 'aria-hidden': 'true' }), link.firstChild);
+      });
+      var settingsOrder = ['general-settings', 'website-information', 'theme-settings', 'website-layout', 'account-settings', 'security-settings', 'forms'];
+      [].slice.call(settingsSubnavElement.querySelectorAll('.cms-nav-link'))
+        .sort(function (a, b) {
+          var aIndex = settingsOrder.indexOf(a.getAttribute('data-nav'));
+          var bIndex = settingsOrder.indexOf(b.getAttribute('data-nav'));
+          return (aIndex === -1 ? settingsOrder.length : aIndex) - (bIndex === -1 ? settingsOrder.length : bIndex);
+        })
+        .forEach(function (link) { settingsSubnavElement.appendChild(link); });
+    }
 
     var notificationButton = document.querySelector('.cms-notif');
     var refreshNotifications = notificationButton ? initNotifications(notificationButton) : null;

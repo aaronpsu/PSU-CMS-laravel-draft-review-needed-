@@ -6,12 +6,13 @@
    ========================================================================== */
 (function () {
   var cfg = CMS.config, ui = CMS.ui, el = ui.el;
-  var data = { categories: [], events: [] };
+  var data = { categories: [], filteredCategories: null, events: [] };
 
   function eventsIn(catId) { return data.events.filter(function (e) { return String(e.categoryId) === String(catId); }); }
 
   function init() {
     var state = { q: '', page: 1 };
+    var searchRequest = 0;
     var body = document.getElementById('categoryTableBody');
     var tableWrap = document.getElementById('categoryTableWrap');
     var emptyBox = document.getElementById('categoryEmpty');
@@ -39,7 +40,7 @@
     }
 
     function render() {
-      var all = data.categories;
+      var all = data.filteredCategories || data.categories;
       var rows = all.filter(matches);
       var size = cfg.pageSize.categories;
       var pages = Math.max(1, Math.ceil(rows.length / size));
@@ -47,13 +48,28 @@
       ui.clear(body); ui.clear(footer);
       if (!rows.length) {
         tableWrap.hidden = true; emptyBox.hidden = false;
-        if (!all.length) ui.renderEmpty(emptyBox, { title: 'No categories yet', text: 'Items you add will appear here.' });
+        if (!state.q && !data.categories.length) ui.renderEmpty(emptyBox, { title: 'No categories yet', text: 'Items you add will appear here.' });
         else ui.renderEmpty(emptyBox, { title: 'No matching categories found', text: 'Try a different search.' });
         return;
       }
       tableWrap.hidden = false; emptyBox.hidden = true;
       rows.slice((state.page - 1) * size, state.page * size).forEach(function (c) { body.appendChild(buildRow(c)); });
       ui.renderFooter(footer, { page: state.page, pageSize: size, total: rows.length, onPage: function (p) { state.page = p; render(); } });
+    }
+
+    function searchCategories() {
+      state.q = searchInput.value.trim();
+      state.page = 1;
+      data.filteredCategories = null;
+      render();
+      var request = ++searchRequest;
+      CMS.api.query('/event-categories', { q: state.q }).then(function (categories) {
+        if (request !== searchRequest) return;
+        data.filteredCategories = categories;
+        render();
+      }).catch(function (error) {
+        if (request === searchRequest) ui.toast(error.message, 'error');
+      });
     }
 
     function showCategory(c) {
@@ -121,13 +137,14 @@
     }
 
     document.getElementById('categoryAdd').addEventListener('click', function () { openForm(null); });
-    searchInput.addEventListener('input', ui.debounce(function () { state.q = searchInput.value.trim(); state.page = 1; render(); }, 180));
+    searchInput.addEventListener('input', ui.debounce(searchCategories, 180));
     refreshData().then(render).catch(function (error) { ui.toast(error.message, 'error'); });
   }
 
   function refreshData() {
     return Promise.all([CMS.api.get('/event-categories'), CMS.api.get('/events')]).then(function (results) {
       data.categories = results[0];
+      data.filteredCategories = null;
       data.events = results[1];
     });
   }

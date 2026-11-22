@@ -12,22 +12,22 @@
   var backLink = document.getElementById('feedbackBack');
   var delBtn = document.getElementById('feedbackDelete');
   var id = ui.getParam('id');
-  var m = store.get(id);
 
   /* Back returns to the Feedback list (keeps its page / filter when possible) */
   if (backLink) backLink.addEventListener('click', function (e) {
     if (document.referrer && document.referrer.indexOf('/messages/feedback.html') !== -1 && window.history.length > 1) { e.preventDefault(); window.history.back(); }
   });
 
-  if (m && m.type !== 'feedback') { window.location.replace('message-details.html?id=' + encodeURIComponent(id)); return; }
-
-  if (!m) {
+  function render(m) {
+    if (m && m.type !== 'feedback') { window.location.replace('message-details.html?id=' + encodeURIComponent(id)); return; }
+    ui.clear(box);
+    if (!m) {
     if (delBtn) delBtn.hidden = true;
     var empty = el('div', { class: 'cms-card' });
     box.appendChild(empty);
     ui.renderEmpty(empty, { title: 'Feedback not found', text: 'It may have been deleted.', actionLabel: 'Back to Feedback', actionHref: 'feedback.html' });
     return;
-  }
+    }
 
   function item(label, content) {
     return el('div', {}, [
@@ -56,8 +56,16 @@
     store.confirmDelete()
       .then(function (yes) {
         if (!yes) return;
-        if (store.remove(m.id)) { ui.flash('Feedback deleted.', 'success'); window.location.href = 'feedback.html'; }
-        else ui.toast('The feedback could not be deleted.', 'error');
+        store.remove(m.id).then(function () {
+          ui.flash('Feedback deleted.', 'success');
+          window.location.href = 'feedback.html';
+        }).catch(function (error) { ui.toast(error.message, 'error'); });
       });
+  });
+  }
+
+  store.get(id).then(render).catch(function (error) {
+    if (error.status === 404) render(null);
+    else ui.renderEmpty(box, { title: 'Unable to load feedback', text: error.message });
   });
 })();

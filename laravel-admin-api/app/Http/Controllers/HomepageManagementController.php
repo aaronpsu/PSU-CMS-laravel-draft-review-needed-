@@ -239,7 +239,7 @@ class HomepageManagementController extends Controller
 
         $query = match ($type) {
             'news' => DB::table('news')
-                ->select('news_id as content_id', 'title', 'summary as description', 'published_at')
+                ->select('news_id as content_id', 'title', 'excerpt as description', 'published_at')
                 ->where('status', 'published'),
             'announcements' => DB::table('announcements')
                 ->select('announcement_id as content_id', 'title', 'content as description', 'published_at')

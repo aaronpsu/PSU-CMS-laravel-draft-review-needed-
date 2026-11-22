@@ -3,6 +3,7 @@
 use App\Http\Controllers\CmsContentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomepageManagementController;
+use App\Http\Controllers\MessageController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SiteSettingsController;
 use App\Http\Middleware\LocalPrototypeOnly;
@@ -57,6 +58,10 @@ Route::middleware([LocalPrototypeOnly::class, 'web', 'auth:web', 'cms.json', 'cm
     Route::get('/health', [CmsContentController::class, 'health']);
     Route::get('/options', [CmsContentController::class, 'options']);
     Route::get('/dashboard', DashboardController::class);
+    Route::get('/messages', [MessageController::class, 'index']);
+    Route::get('/messages/{messageId}', [MessageController::class, 'show'])->where('messageId', '[cf]-[0-9]+');
+    Route::put('/messages/{messageId}', [MessageController::class, 'update'])->where('messageId', '[cf]-[0-9]+');
+    Route::delete('/messages/{messageId}', [MessageController::class, 'destroy'])->where('messageId', '[cf]-[0-9]+');
 
     Route::get('/news', [CmsContentController::class, 'newsIndex']);
     Route::get('/news/{id}', [CmsContentController::class, 'newsShow'])->whereNumber('id');
@@ -139,6 +144,11 @@ Route::get('/homepage/public', [HomepageManagementController::class, 'publicHome
 Route::get('/homepage/banners/{id}/image', [HomepageManagementController::class, 'bannerImage'])
     ->whereNumber('id')
     ->name('homepage.banner-image');
+
+Route::middleware([LocalPrototypeOnly::class, 'web'])->group(function (): void {
+    Route::get('/contact/options', [MessageController::class, 'options']);
+    Route::post('/contact-submissions', [MessageController::class, 'store'])->middleware('cms.json');
+});
 
 
 
