@@ -10,9 +10,9 @@ use Illuminate\Support\Facades\DB;
  * GET /api/dashboard
  *
  * Read-only aggregates for the admin dashboard. All figures come from cms_db;
- * nothing is cached or invented. The schema has no audit-log table, so "recent
- * activity" is derived from created_at/updated_at and the created_by/updated_by
- * user references (see activity()).
+ * nothing is cached or invented. Targets the psu_cms_admin schema. Nothing writes
+ * to activity_logs yet, so "recent activity" is derived from created_at/updated_at
+ * and created_by (see recentActivity()).
  */
 class DashboardController extends Controller
 {
@@ -23,11 +23,23 @@ class DashboardController extends Controller
         $year = (int) DB::scalar('SELECT YEAR(CURDATE())');
 
         return response()->json([
-            'cards'           => $this->cards(),
-            'chart'           => ['year' => $year, 'series' => $this->chartSeries($year)],
-            'recentPublished' => $this->recentPublished(),
-            'recentActivity'  => $this->recentActivity(),
+            'cards'           => $this->safe('cards', fn () => $this->cards(), []),
+            'chart'           => ['year' => $year, 'series' => $this->safe('chart', fn () => $this->chartSeries($year), [])],
+            'recentPublished' => $this->safe('recentPublished', fn () => $this->recentPublished(), []),
+            'recentActivity'  => $this->safe('recentActivity', fn () => $this->recentActivity(), []),
         ]);
+    }
+
+    /** One broken section must not blank the whole dashboard; log it and return a fallback. */
+    private function safe(string $section, \Closure $fn, mixed $fallback): mixed
+    {
+        try {
+            return $fn();
+        } catch (\Throwable $e) {
+            report($e);
+            logger()->error("Dashboard section '{$section}' failed: " . $e->getMessage());
+            return $fallback;
+        }
     }
 
     private function cards(): array
@@ -49,7 +61,7 @@ class DashboardController extends Controller
         return [
             'news'          => $this->monthly('news', 'published_at', $year, fn ($q) => $q->where('status', 'published')),
             'announcements' => $this->monthly('announcements', 'published_at', $year, fn ($q) => $q->where('status', 'published')),
-            'events'        => $this->monthly('events', 'created_at', $year, fn ($q) => $q->whereIn('status', ['published', 'completed'])),
+            'events'        => $this->monthly('events', 'published_at', $year, fn ($q) => $q->whereIn('status', ['published', 'completed'])),
             'documents'     => $this->monthly('documents', 'created_at', $year),
             'other'         => $this->monthly('media', 'created_at', $year),
         ];
@@ -98,7 +110,7 @@ class DashboardController extends Controller
             ->where('e.status', 'published')
             ->select([
                 DB::raw("'event' as type"), 'e.event_id as id', 'e.title',
-                'e.created_at as published_on', 'm.media_id as media_id',
+                DB::raw('COALESCE(e.published_at, e.created_at) as published_on'), 'm.media_id as media_id',
             ]);
 
         return DB::query()
@@ -118,21 +130,23 @@ class DashboardController extends Controller
 
     /**
      * Newest row changes across the main content tables. "Added" vs "Edited" is
-     * inferred from updated_at differing from created_at; the actor is
-     * updated_by (falling back to created_by), or uploaded_by for documents.
+     * inferred from updated_at differing from created_at; the actor is the
+     * creator (created_by) because psu_cms_admin does not track who edited.
      */
     private function recentActivity(): array
     {
+        // psu_cms_admin has no updated_by column and no audit rows are written to
+        // activity_logs, so the actor is the record's creator (created_by).
         $sources = [
-            ['news', 'news_id', 'title', 'news', 'COALESCE(t.updated_by, t.created_by)', 't.status', 't.updated_at'],
-            ['announcements', 'announcement_id', 'title', 'announcement', 'COALESCE(t.updated_by, t.created_by)', 't.status', 't.updated_at'],
-            ['events', 'event_id', 'title', 'event', 'COALESCE(t.updated_by, t.created_by)', 't.status', 't.updated_at'],
-            ['faculty', 'faculty_id', 'name', 'personnel', 'COALESCE(t.updated_by, t.created_by)', 'NULL', 't.updated_at'],
-            ['documents', 'document_id', 'COALESCE(t.title, t.file_name)', 'document', 't.uploaded_by', 'NULL', 't.created_at'],
+            ['news', 'title', 'news', 't.created_by', 't.status', 't.updated_at'],
+            ['announcements', 'title', 'announcement', 't.created_by', 't.status', 't.updated_at'],
+            ['events', 'title', 'event', 't.created_by', 't.status', 't.updated_at'],
+            ['faculty_staff', "TRIM(CONCAT_WS(' ', t.first_name, t.last_name))", 'personnel', 'NULL', 'NULL', 't.updated_at'],
+            ['documents', 'COALESCE(t.title, t.file_name)', 'document', 't.created_by', 'NULL', 't.created_at'],
         ];
 
         $union = null;
-        foreach ($sources as [$table, , $titleExpr, $kind, $actorExpr, $statusExpr, $tsColumn]) {
+        foreach ($sources as [$table, $titleExpr, $kind, $actorExpr, $statusExpr, $tsColumn]) {
             $title = str_contains($titleExpr, '(') ? $titleExpr : "t.{$titleExpr}";
             $edited = $tsColumn === 't.updated_at' ? 'TIMESTAMPDIFF(SECOND, t.created_at, t.updated_at)' : '0';
 
