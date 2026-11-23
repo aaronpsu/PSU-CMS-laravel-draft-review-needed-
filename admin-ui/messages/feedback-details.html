@@ -44,7 +44,12 @@
       </div>
     </div>
     <a class="cms-nav-link" href="#" data-nav="university" data-pending="University Structure"><i class="bi bi-bank" aria-hidden="true"></i><span class="cms-nav-text">University Structure</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
-    <a class="cms-nav-link" href="#" data-nav="faculty" data-pending="Faculty &amp; Staff Directory"><i class="bi bi-people" aria-hidden="true"></i><span class="cms-nav-text">Faculty &amp; Staff Directory</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
+    <div class="cms-nav-group" data-group="faculty">
+      <button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-university"><i class="bi bi-people" aria-hidden="true"></i><span class="cms-nav-text">Faculty &amp; Staff Directory</span><span class="cms-nav-caret" aria-hidden="true"></span></button>
+      <div class="cms-subnav" id="subnav-faculty">
+          <a class="cms-nav-link" href="../faculty/index.html" data-nav="personnel"><span class="cms-nav-text">All Personnel</span></a>
+      </div>
+    </div>
     <p class="cms-nav-label">Resources</p>
     <a class="cms-nav-link" href="#" data-nav="documents" data-pending="Document Library"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><span class="cms-nav-text">Document Library</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
     <a class="cms-nav-link" href="#" data-nav="media" data-pending="Media Library"><i class="bi bi-image" aria-hidden="true"></i><span class="cms-nav-text">Media Library</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
@@ -58,9 +63,16 @@
       </div>
     </div>
     <a class="cms-nav-link" href="../search/search-results.html" data-nav="search"><i class="bi bi-search" aria-hidden="true"></i><span class="cms-nav-text">Search</span></a>
-    <p class="cms-nav-label">System</p>
-    <a class="cms-nav-link" href="#" data-nav="users" data-pending="User Management"><i class="bi bi-person" aria-hidden="true"></i><span class="cms-nav-text">User Management</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
-    <div class="cms-nav-group" data-group="settings">
+    <p class="cms-nav-label">System</p>|
+    <div class="cms-nav-group" data-group="users">
+        <button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-users"><i class="bi bi-person" aria-hidden="true"></i><span class="cms-nav-text">User Management</span><span class="cms-nav-caret" aria-hidden="true"></span></button>
+        <div class="cms-subnav" id="subnav-users">
+            <a class="cms-nav-link" href="../users/all-users.html" data-nav="all-users"><span class="cms-nav-text">All Users</span></a>
+            <a class="cms-nav-link" href="../users/add-user.html" data-nav="add-user"><span class="cms-nav-text">Add New User</span></a>
+            <a class="cms-nav-link" href="../users/user-roles.html" data-nav="user-roles"><span class="cms-nav-text">User Roles</span></a>
+        </div>
+    </div>
+   <div class="cms-nav-group" data-group="settings">
       <button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-settings"><i class="bi bi-sliders" aria-hidden="true"></i><span class="cms-nav-text">Settings</span><span class="cms-nav-caret" aria-hidden="true"></span></button>
       <div class="cms-subnav" id="subnav-settings">
         <a class="cms-nav-link" href="#" data-nav="general-settings" data-pending="General Settings"><span class="cms-nav-text">General Settings</span></a>
@@ -74,7 +86,6 @@
       <div class="cms-subnav" id="subnav-appearance">
         <a class="cms-nav-link" href="../settings/theme-settings.html" data-nav="theme-settings"><span class="cms-nav-text">Theme Settings</span></a>
         <a class="cms-nav-link" href="#" data-nav="website-layout" data-pending="Website Layout"><span class="cms-nav-text">Website Layout</span></a>
-      </div>
     </div>
   </nav>
 </aside>

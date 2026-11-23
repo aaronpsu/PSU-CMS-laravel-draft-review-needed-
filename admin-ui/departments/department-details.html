@@ -50,7 +50,12 @@
         <a class="cms-nav-link" href="../programs/academic-programs.html" data-nav="programs"><span class="cms-nav-text">Academic Programs</span></a>
       </div>
     </div>
-    <a class="cms-nav-link" href="#" data-nav="faculty" data-pending="Faculty &amp; Staff Directory"><i class="bi bi-people" aria-hidden="true"></i><span class="cms-nav-text">Faculty &amp; Staff Directory</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
+    <div class="cms-nav-group" data-group="faculty">
+      <button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-university"><i class="bi bi-people" aria-hidden="true"></i><span class="cms-nav-text">Faculty &amp; Staff Directory</span><span class="cms-nav-caret" aria-hidden="true"></span></button>
+      <div class="cms-subnav" id="subnav-faculty">
+          <a class="cms-nav-link" href="../faculty/index.html" data-nav="personnel"><span class="cms-nav-text">All Personnel</span></a>
+      </div>
+    </div>
     <p class="cms-nav-label">Resources</p>
     <a class="cms-nav-link" href="#" data-nav="documents" data-pending="Document Library"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><span class="cms-nav-text">Document Library</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
     <a class="cms-nav-link" href="#" data-nav="media" data-pending="Media Library"><i class="bi bi-image" aria-hidden="true"></i><span class="cms-nav-text">Media Library</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
@@ -66,8 +71,22 @@
         <a class="cms-nav-link" href="../users/user-roles.html" data-nav="user-roles"><span class="cms-nav-text">User Roles</span></a>
       </div>
     </div>
-    <a class="cms-nav-link" href="#" data-nav="settings" data-pending="Settings"><i class="bi bi-sliders" aria-hidden="true"></i><span class="cms-nav-text">Settings</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
-    <a class="cms-nav-link" href="#" data-nav="appearance" data-pending="Appearance"><i class="bi bi-palette" aria-hidden="true"></i><span class="cms-nav-text">Appearance</span><span class="cms-nav-caret" aria-hidden="true"></span></a>
+   <div class="cms-nav-group" data-group="settings">
+      <button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-settings"><i class="bi bi-sliders" aria-hidden="true"></i><span class="cms-nav-text">Settings</span><span class="cms-nav-caret" aria-hidden="true"></span></button>
+      <div class="cms-subnav" id="subnav-settings">
+        <a class="cms-nav-link" href="#" data-nav="general-settings" data-pending="General Settings"><span class="cms-nav-text">General Settings</span></a>
+        <a class="cms-nav-link" href="#" data-nav="website-information" data-pending="Website Information"><span class="cms-nav-text">Website Information</span></a>
+        <a class="cms-nav-link" href="../settings/account-settings.html" data-nav="account-settings"><span class="cms-nav-text">Account Settings</span></a>
+        <a class="cms-nav-link" href="../settings/security-settings.html" data-nav="security-settings"><span class="cms-nav-text">Security Settings</span></a>
+      </div>
+    </div>
+    <div class="cms-nav-group" data-group="appearance">
+      <button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-appearance"><i class="bi bi-palette" aria-hidden="true"></i><span class="cms-nav-text">Appearance</span><span class="cms-nav-caret" aria-hidden="true"></span></button>
+      <div class="cms-subnav" id="subnav-appearance">
+        <a class="cms-nav-link" href="../settings/theme-settings.html" data-nav="theme-settings"><span class="cms-nav-text">Theme Settings</span></a>
+        <a class="cms-nav-link" href="#" data-nav="website-layout" data-pending="Website Layout"><span class="cms-nav-text">Website Layout</span></a>
+      </div>
+    </div>
   </nav>
 </aside>
 <div class="cms-backdrop"></div>

@@ -9,8 +9,9 @@
   <link rel="stylesheet" href="../css/cms-base.css">
   <link rel="stylesheet" href="../css/cms-layout.css">
   <link rel="stylesheet" href="../css/cms-components.css">
+  <link rel="stylesheet" href="../css/structure.css">
 </head>
-<body class="cms-body" data-page="faculty">
+<body class="cms-body" data-page="personnel">
 <div class="cms-shell">
   <aside class="cms-sidebar" id="cmsSidebar" aria-label="Sidebar">
     <a class="cms-brand" href="../index.html">
@@ -47,7 +48,12 @@
           <a class="cms-nav-link" href="../departments/departments.html" data-nav="departments"><span class="cms-nav-text">Departments</span></a>
           <a class="cms-nav-link" href="../programs/academic-programs.html" data-nav="programs"><span class="cms-nav-text">Academic Programs</span></a>
           <a class="cms-nav-link" href="../campuses/campuses.html" data-nav="campuses"><span class="cms-nav-text">Campuses</span></a>
-          <a class="cms-nav-link" href="index.html" data-nav="faculty"><span class="cms-nav-text">Faculty &amp; Staff Directory</span></a>
+        </div>
+      </div>
+      <div class="cms-nav-group" data-group="faculty">
+        <button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-university"><i class="bi bi-people" aria-hidden="true"></i><span class="cms-nav-text">Faculty &amp; Staff Directory</span><span class="cms-nav-caret" aria-hidden="true"></span></button>
+        <div class="cms-subnav" id="subnav-faculty">
+            <a class="cms-nav-link" href="../faculty/index.html" data-nav="personnel"><span class="cms-nav-text">All Personnel</span></a>
         </div>
       </div>
       <p class="cms-nav-label">Resources</p>
