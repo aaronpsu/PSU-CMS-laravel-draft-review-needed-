@@ -8,7 +8,8 @@ window.CMS = window.CMS || {};
 CMS.config = {
   /* All localStorage keys start with this prefix (avoids clashing with teammates). */
   storagePrefix: 'psucms.',
-  apiBase: 'http://127.0.0.1:8001/api',
+  apiBase: (window.location.protocol === 'http:' || window.location.protocol === 'https:'
+    ? window.location.protocol : 'http:') + '//' + (window.location.hostname || '127.0.0.1') + ':8001/api',
 
   /* ---- Optional features -------------------------------------------------
      Waiting on the UI team. Set a flag to false and the related fields,
@@ -22,14 +23,12 @@ CMS.config = {
   allCampuses: 'All Campuses',
   campuses: ['Lingayen', 'Urdaneta', 'Bayambang', 'Alaminos City', 'Asingan', 'Binmaley', 'Infanta', 'San Carlos City', 'Santa Maria'],
 
-  /* ---- Simulated user. No real login; this only drives the demo rules.
-     role 'super_admin' may target any campus. role 'campus_admin' may only
-     target their own campus (set campus to one of the names above). ------- */
-  currentUser: { name: 'Admin User', role: 'super_admin', campus: null },
+  currentUser: null,
 
   /* ---- Fixed dropdown lists (the designs show no screen to manage these) - */
   newsCategories: ['Campus News', 'Academics', 'Research', 'Sports', 'Events', 'Community'],
   announcementCategories: ['Academic', 'Advisory', 'Scholarship', 'Administrative'],
+  feedbackCategories: ['Website', 'Services', 'Facilities', 'Other'],
 
   /* ---- Status lists. `value` is what is stored, `label` is what is shown. */
   newsStatuses: [

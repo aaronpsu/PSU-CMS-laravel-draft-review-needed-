@@ -214,7 +214,7 @@ CMS.layout = (function () {
     return loadNotifications;
   }
 
-  function initAccount(button, refreshNotifications) {
+  function initAccount(button, refreshNotifications, user) {
     var accountName = button.querySelector('.cms-user-name');
     var currentUser = null;
 
@@ -247,7 +247,7 @@ CMS.layout = (function () {
             setUser(null);
             if (refreshNotifications) refreshNotifications();
             modal.hide();
-            CMS.ui.toast('You have signed out.', 'success');
+            window.location.replace(new URL('../login/login-sc.html', window.location.href).href);
           }).catch(function (error) {
             logout.disabled = false;
             CMS.ui.toast(error.message, 'error');
@@ -282,18 +282,11 @@ CMS.layout = (function () {
     }
 
     button.removeAttribute('data-pending');
+    setUser(user);
     button.addEventListener('click', openAccountDialog);
-    loadApiClient().then(function (api) {
-      return api.get('/auth/me');
-    }).then(function (result) {
-      setUser(result.user || null);
-    }).catch(function (error) {
-      if (error.status !== 401) CMS.ui.toast('Could not check the current account: ' + error.message, 'error');
-      setUser(null);
-    });
   }
 
-  function init() {
+  function initLayout(user) {
     var pendingPages = {
       dashboard: '../dashboard/dashboard.html',
       homepage: '../homapage/homepage-mg.html',
@@ -343,8 +336,9 @@ CMS.layout = (function () {
       return label.textContent.trim() === 'Main';
     })[0];
     if (facultyLink) {
-      var caret = facultyLink.querySelector('.cms-nav-caret');
-      if (caret) caret.remove();
+      [].forEach.call(facultyLink.querySelectorAll('.bi, .cms-nav-caret'), function (icon) {
+        icon.remove();
+      });
       if (mainNavLabel) {
         var dashboardLink = mainNavLabel.nextElementSibling;
         var insertAfter = dashboardLink && dashboardLink.getAttribute('data-nav') === 'dashboard' ? dashboardLink : mainNavLabel;
@@ -376,9 +370,6 @@ CMS.layout = (function () {
 
     var settingsToggleElement = settingsGroupElement && settingsGroupElement.querySelector('.cms-nav-toggle');
     if (settingsToggleElement) {
-      if (!settingsToggleElement.querySelector('.bi')) {
-        settingsToggleElement.insertBefore(CMS.ui.el('i', { class: 'bi bi-sliders', 'aria-hidden': 'true' }), settingsToggleElement.firstChild);
-      }
       if (!settingsToggleElement.querySelector('.cms-nav-caret')) {
         settingsToggleElement.appendChild(CMS.ui.el('span', { class: 'cms-nav-caret', 'aria-hidden': 'true' }));
       }
@@ -398,12 +389,14 @@ CMS.layout = (function () {
     function addSubnavLink(groupName, label, page, href) {
       var subnav = document.querySelector('.cms-nav-group[data-group="' + groupName + '"] .cms-subnav');
       if (!subnav || subnav.querySelector('.cms-nav-link[data-nav="' + page + '"]')) return;
+      var children = [];
+      if (groupName !== 'settings') {
+        children.push(CMS.ui.el('i', { class: 'bi bi-' + (subnavIcons[page] || 'gear'), 'aria-hidden': 'true' }));
+      }
+      children.push(CMS.ui.el('span', { class: 'cms-nav-text', text: label }));
       subnav.appendChild(CMS.ui.el('a', {
         class: 'cms-nav-link', href: new URL(href, window.location.href).href, 'data-nav': page
-      }, [
-        CMS.ui.el('i', { class: 'bi bi-' + (subnavIcons[page] || 'gear'), 'aria-hidden': 'true' }),
-        CMS.ui.el('span', { class: 'cms-nav-text', text: label })
-      ]));
+      }, children));
     }
 
     addSubnavLink('settings', 'General Settings', 'general-settings', '../system/system-gen.html');
@@ -414,12 +407,12 @@ CMS.layout = (function () {
     addSubnavLink('settings', 'Account Settings', 'account-settings', '../settings/account-settings.html');
     addSubnavLink('settings', 'Security Settings', 'security-settings', '../settings/security-settings.html');
     addSubnavLink('settings', 'Forms', 'forms', '../contact/contact-form.html');
-    if (settingsSubnavElement) {
-      [].forEach.call(settingsSubnavElement.querySelectorAll('.cms-nav-link'), function (link) {
-        if (link.querySelector('.bi')) return;
-        var icon = subnavIcons[link.getAttribute('data-nav')] || 'gear';
-        link.insertBefore(CMS.ui.el('i', { class: 'bi bi-' + icon, 'aria-hidden': 'true' }), link.firstChild);
+    if (settingsGroupElement) {
+      [].forEach.call(settingsGroupElement.querySelectorAll('.bi'), function (icon) {
+        icon.remove();
       });
+    }
+    if (settingsSubnavElement) {
       var settingsOrder = ['general-settings', 'website-information', 'theme-settings', 'website-layout', 'account-settings', 'security-settings', 'forms'];
       [].slice.call(settingsSubnavElement.querySelectorAll('.cms-nav-link'))
         .sort(function (a, b) {
@@ -428,6 +421,11 @@ CMS.layout = (function () {
           return (aIndex === -1 ? settingsOrder.length : aIndex) - (bIndex === -1 ? settingsOrder.length : bIndex);
         })
         .forEach(function (link) { settingsSubnavElement.appendChild(link); });
+    }
+    if (String(user.role || '').toLowerCase() !== 'admin') {
+      var userManagementLink = document.querySelector('.cms-sidebar .cms-nav-link[data-nav="users"]');
+      if (userManagementLink) userManagementLink.hidden = true;
+      if (settingsGroupElement) settingsGroupElement.hidden = true;
     }
 
     var notificationButton = document.querySelector('.cms-notif');
@@ -440,7 +438,7 @@ CMS.layout = (function () {
     }
 
     var accountButton = document.querySelector('.cms-user');
-    if (accountButton) initAccount(accountButton, refreshNotifications);
+    if (accountButton) initAccount(accountButton, refreshNotifications, user);
 
     /* 1. active link + its group */
     var page = document.body.getAttribute('data-page');
@@ -501,6 +499,54 @@ CMS.layout = (function () {
     CMS.ui.applyFeatures();
     CMS.ui.enhanceSelects();
     CMS.ui.showFlash();
+  }
+
+  function showAuthenticationError(error) {
+    document.body.classList.add('cms-auth-error');
+    var panel = document.createElement('main');
+    panel.className = 'cms-auth-message';
+    var heading = document.createElement('h1');
+    heading.textContent = 'Unable to verify your sign-in';
+    var message = document.createElement('p');
+    message.textContent = 'The administration panel is hidden until your session can be checked. ' + error.message;
+    var actions = document.createElement('div');
+    actions.className = 'cms-auth-message-actions';
+    var retry = document.createElement('button');
+    retry.type = 'button';
+    retry.className = 'cms-btn cms-btn-primary';
+    retry.textContent = 'Try again';
+    retry.addEventListener('click', function () { window.location.reload(); });
+    var signIn = document.createElement('a');
+    signIn.className = 'cms-btn cms-btn-outline';
+    signIn.href = new URL('../login/login-sc.html', window.location.href).href;
+    signIn.textContent = 'Go to sign in';
+    actions.appendChild(retry);
+    actions.appendChild(signIn);
+    panel.appendChild(heading);
+    panel.appendChild(message);
+    panel.appendChild(actions);
+    document.body.appendChild(panel);
+  }
+
+  function init() {
+    loadApiClient().then(function (api) {
+      return api.get('/auth/me');
+    }).then(function (result) {
+      if (!result.user) {
+        var error = new Error('Please sign in to continue.');
+        error.status = 401;
+        throw error;
+      }
+      CMS.config.currentUser = result.user;
+      initLayout(result.user);
+      document.body.classList.add('cms-authenticated');
+    }).catch(function (error) {
+      if (error.status === 401) {
+        window.location.replace(new URL('../login/login-sc.html', window.location.href).href);
+        return;
+      }
+      showAuthenticationError(error);
+    });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

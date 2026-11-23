@@ -61,8 +61,15 @@ class User extends Authenticatable
 
     public function getRoleAttribute($value): ?string
     {
-        if (is_string($value) && $value !== '') {
-            return $value;
+        if (is_string($value) && trim($value) !== '') {
+            $role = trim($value);
+
+            return match (strtolower($role)) {
+                'super administrator', 'administrator', 'admin' => 'admin',
+                'editor' => 'editor',
+                'author' => 'author',
+                default => $role,
+            };
         }
 
         $roleName = DB::table('roles')->where('role_id', $this->attributes['role_id'] ?? null)->value('name');

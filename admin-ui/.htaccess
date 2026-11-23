@@ -1,0 +1,14 @@
+Options -Indexes -MultiViews
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^(?:index\.html|login/login-sc\.html|setup/setup\.html)$ - [END,NC]
+  RewriteRule ^(.+)/$ access.php?file=$1/index.html [END,QSA,NC]
+  RewriteRule ^(.+\.html)$ access.php?file=$1 [END,QSA,NC]
+</IfModule>
+
+<IfModule !mod_rewrite.c>
+  <FilesMatch "\.html$">
+    Require all denied
+  </FilesMatch>
+</IfModule>

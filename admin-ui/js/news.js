@@ -156,7 +156,7 @@
       var opts = [{ value: '', label: 'Select campus' }].concat(campusOptions.map(function (c) { return { value: c.id, label: c.name }; }));
       ui.setOptions(f.campus, opts, editing ? editing.campusId : '');
     }
-    f.author.value = editing ? editing.author : cfg.currentUser.name;
+    f.author.value = editing ? editing.author : (cfg.currentUser ? cfg.currentUser.name : '');
     if (editing) {
       f.title.value = editing.title; f.date.value = editing.publishedAt || ''; f.summary.value = editing.shortDescription || '';
       editor.setHtml(editing.content || ''); image = editing.image || '';
@@ -213,7 +213,8 @@
       saving = true;
       saveButtons.forEach(function (button) { button.disabled = true; });
       var record = {
-        title: f.title.value.trim(), categoryId: Number(f.category.value), author: f.author.value.trim() || cfg.currentUser.name,
+        title: f.title.value.trim(), categoryId: Number(f.category.value),
+        author: f.author.value.trim() || (cfg.currentUser ? cfg.currentUser.name : ''),
         campusId: f.campus && f.campus.value ? Number(f.campus.value) : null,
         publishedAt: f.date.value || (status === 'published' ? ui.todayISO() : ''),
         shortDescription: f.summary.value.trim(), content: editor.getHtml(), image: image, status: status

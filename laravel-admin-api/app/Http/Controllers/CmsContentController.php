@@ -425,19 +425,37 @@ class CmsContentController extends Controller
 
     public function campusDestroy(int $id): JsonResponse
     {
-        abort_unless(DB::table('campuses')->where('campus_id', $id)->exists(), 404);
-        $newsCount = DB::table('news')->where('campus_id', $id)->count();
-        $announcementCount = DB::table('announcements')->where('campus_id', $id)->count();
-        if ($newsCount || $announcementCount) {
-            return response()->json([
-                'message' => 'Move or clear the campus assignment on related news and announcements first.',
-                'newsCount' => $newsCount,
-                'announcementCount' => $announcementCount,
-            ], 409);
-        }
-        DB::table('campuses')->where('campus_id', $id)->delete();
+        return DB::transaction(function () use ($id): JsonResponse {
+            $campus = DB::table('campuses')->where('campus_id', $id)->lockForUpdate()->first();
+            abort_unless($campus !== null, 404);
+            $references = [
+                'announcements' => DB::table('announcements')->where('campus_id', $id)->count(),
+                'colleges' => DB::table('colleges')->where('campus_id', $id)->count(),
+                'contactSubmissions' => DB::table('contact_submissions')->where('campus_id', $id)->count(),
+                'departments' => DB::table('departments')->where('campus_id', $id)->count(),
+                'documents' => DB::table('documents')->where('campus_id', $id)->count(),
+                'events' => DB::table('events')->where('campus_id', $id)->count(),
+                'facultyStaff' => DB::table('faculty_staff')->where('campus_id', $id)->count(),
+                'faqs' => DB::table('faqs')->where('campus_id', $id)->count(),
+                'featuredItems' => DB::table('featured_items')->where('campus_id', $id)->count(),
+                'feedbackSubmissions' => DB::table('feedback_submissions')->where('campus_id', $id)->count(),
+                'homepageSections' => DB::table('homepage_sections')->where('campus_id', $id)->count(),
+                'news' => DB::table('news')->where('campus_id', $id)->count(),
+                'pages' => DB::table('pages')->where('campus_id', $id)->count(),
+                'programCampuses' => DB::table('program_campuses')->where('campus_id', $id)->count(),
+                'themes' => DB::table('themes')->where('campus_id', $id)->count(),
+                'users' => DB::table('users')->where('campus_id', $id)->count(),
+            ];
+            if (array_sum($references) > 0) {
+                return response()->json([
+                    'message' => 'This campus is in use. Reassign or remove its related records before deleting it.',
+                    'references' => $references,
+                ], 409);
+            }
+            DB::table('campuses')->where('campus_id', $id)->delete();
 
-        return response()->json(['deleted' => true]);
+            return response()->json(['deleted' => true]);
+        });
     }
 
     public function collegesIndex(Request $request): JsonResponse
@@ -583,26 +601,26 @@ class CmsContentController extends Controller
     {
         $filters = $request->validate([
             'q'      => ['nullable', 'string', 'max:200'],
-            'role'   => ['nullable', 'string', 'max:50'],
+            'roleId' => ['nullable', 'integer', Rule::exists('roles', 'role_id')],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
         ]);
-        $roleExpression = $this->normalizedUserRoleExpression();
         $query = DB::table('users as u')
             ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
             ->select([
-                'u.user_id as id', 'u.full_name as fullName', 'u.email',
-                DB::raw($roleExpression . ' as role'), 'u.status',
+                'u.user_id as id', 'u.full_name as fullName', 'u.email', 'u.role_id as roleId',
+                'r.name as role', 'u.status',
             ]);
         if (! empty($filters['q'])) {
             $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
                 $q->where('u.full_name', 'like', $term)
                     ->orWhere('u.email', 'like', $term)
-                    ->orWhereRaw($this->normalizedUserRoleExpression() . ' LIKE ?', [$term]);
+                    ->orWhere('r.name', 'like', $term)
+                    ->orWhere('u.role', 'like', $term);
             });
         }
-        if (! empty($filters['role'])) {
-            $query->whereRaw($roleExpression . ' = ?', [$filters['role']]);
+        if (! empty($filters['roleId'])) {
+            $query->where('u.role_id', $filters['roleId']);
         }
         if (! empty($filters['status'])) {
             $query->where('u.status', $filters['status']);
@@ -634,35 +652,37 @@ class CmsContentController extends Controller
         if (request()->user()?->user_id === $id) {
             return response()->json(['message' => 'You cannot delete the currently signed-in account.'], 422);
         }
-        $activeAdmins = DB::table('users as u')
-            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
-            ->where('u.status', 'active')
-            ->whereRaw($this->normalizedUserRoleExpression() . ' = ?', ['admin'])
-            ->count();
-        $target = DB::table('users as u')
-            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
-            ->where('u.user_id', $id)
-            ->selectRaw($this->normalizedUserRoleExpression() . ' as role, u.status')
-            ->first();
-        if ($target && $target->role === 'admin' && $target->status === 'active' && $activeAdmins <= 1) {
-            return response()->json(['message' => 'The final active administrator cannot be deleted.'], 422);
-        }
-        DB::table('users')->where('user_id', $id)->delete();
 
-        return response()->json(['deleted' => true]);
+        return DB::transaction(function () use ($id): JsonResponse {
+            $activeAdmins = $this->activeAdministratorIds(true);
+            if (in_array($id, $activeAdmins, true) && count($activeAdmins) <= 1) {
+                return response()->json(['message' => 'The final active administrator cannot be deleted.'], 422);
+            }
+            DB::table('users')->where('user_id', $id)->delete();
+
+            return response()->json(['deleted' => true]);
+        });
     }
 
     public function userRolesIndex(): JsonResponse
     {
-        $roleExpression = $this->normalizedUserRoleExpression();
-        $roles = DB::table('users as u')
-            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
-            ->selectRaw($roleExpression . ' as name, COUNT(*) as userCount')
-            ->groupByRaw($roleExpression)
-            ->orderBy('name')
+        $roles = DB::table('roles as r')
+            ->leftJoin('users as u', 'u.role_id', '=', 'r.role_id')
+            ->selectRaw('r.role_id as roleId, r.name, COUNT(u.user_id) as userCount')
+            ->groupBy('r.role_id', 'r.name')
+            ->orderBy('r.name')
             ->get();
 
-        return response()->json($roles);
+        $protectedNames = ['super administrator', 'administrator', 'editor', 'author'];
+
+        return response()->json($roles->map(static function (object $role) use ($protectedNames): array {
+            return [
+                'roleId' => (int) $role->roleId,
+                'name' => (string) $role->name,
+                'userCount' => (int) $role->userCount,
+                'canRename' => ! in_array(strtolower((string) $role->name), $protectedNames, true),
+            ];
+        }));
     }
 
     public function userRoleUpdate(Request $request): JsonResponse
@@ -673,22 +693,19 @@ class CmsContentController extends Controller
         ]);
         $oldName = trim($data['currentName']);
         $newName = trim($data['name']);
-        $roleExpression = $this->normalizedUserRoleExpression();
-        $userIds = DB::table('users as u')
-            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
-            ->whereRaw($roleExpression . ' = ?', [$oldName])
-            ->pluck('u.user_id');
-        $existing = $userIds->count();
-        abort_unless($existing > 0, 404, 'The role is no longer assigned to any users.');
-        $roleExists = DB::table('users as u')
-            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
-            ->whereRaw($roleExpression . ' = ?', [$newName])
-            ->exists();
+        $role = DB::table('roles')->where('name', $oldName)->first(['role_id', 'name']);
+        abort_unless($role !== null, 404, 'The role no longer exists.');
+        if (in_array(strtolower((string) $role->name), ['super administrator', 'administrator', 'editor', 'author'], true)) {
+            return response()->json(['message' => 'Built-in roles cannot be renamed.'], 422);
+        }
+        $roleExists = DB::table('roles')->where('name', $newName)->where('role_id', '!=', $role->role_id)->exists();
         if (strcasecmp($oldName, $newName) !== 0 && $roleExists) {
             return response()->json(['message' => 'A role with this name already exists.'], 422);
         }
-        DB::transaction(function () use ($userIds, $newName): void {
-            DB::table('users')->whereIn('user_id', $userIds)->update(['role' => $newName, 'updated_at' => now()]);
+        $existing = DB::table('users')->where('role_id', $role->role_id)->count();
+        DB::transaction(function () use ($role, $newName): void {
+            DB::table('roles')->where('role_id', $role->role_id)->update(['name' => $newName]);
+            DB::table('users')->where('role_id', $role->role_id)->update(['role' => null, 'updated_at' => now()]);
         });
 
         return response()->json(['name' => $newName, 'userCount' => $existing]);
@@ -1023,23 +1040,34 @@ class CmsContentController extends Controller
 
     public function mediaDestroy(int $id): JsonResponse
     {
-        $media = DB::table('media')->where('media_id', $id)->first();
-        abort_unless($media !== null, 404);
-        $references = [
-            'news' => DB::table('news')->where('cover_media_id', $id)->count(),
-            'events' => DB::table('events')->where('cover_media_id', $id)->count(),
-            'colleges' => DB::table('colleges')->where('logo_media_id', $id)->count(),
-        ];
-        if (array_sum($references) > 0) {
-            return response()->json([
-                'message' => 'This media file is in use. Remove its references before deleting it.',
-                'references' => $references,
-            ], 409);
-        }
-        $this->deleteStoredUpload((string) $media->file_path);
-        DB::table('media')->where('media_id', $id)->delete();
+        return DB::transaction(function () use ($id): JsonResponse {
+            $media = DB::table('media')->where('media_id', $id)->lockForUpdate()->first();
+            abort_unless($media !== null, 404);
+            $references = [
+                'news' => DB::table('news')->where('cover_media_id', $id)->count(),
+                'events' => DB::table('events')->where('cover_media_id', $id)->count(),
+                'collegeLogos' => DB::table('colleges')->where('logo_media_id', $id)->count(),
+                'collegeHeaders' => DB::table('colleges')->where('header_media_id', $id)->count(),
+                'facultyPhotos' => DB::table('faculty_staff')->where('photo_media_id', $id)->count(),
+                'homepageItems' => DB::table('homepage_section_items')->where('media_id', $id)->count(),
+                'themePreviews' => DB::table('themes')->where('preview_media_id', $id)->count(),
+                'userAvatars' => DB::table('users')->where('avatar_media_id', $id)->count(),
+                'siteSettingsLogo' => DB::table('site_settings')
+                    ->where('setting_key', 'logo_media_id')
+                    ->where('setting_value', (string) $id)
+                    ->count(),
+            ];
+            if (array_sum($references) > 0) {
+                return response()->json([
+                    'message' => 'This media file is in use. Remove its references before deleting it.',
+                    'references' => $references,
+                ], 409);
+            }
+            $this->deleteStoredUpload((string) $media->file_path);
+            DB::table('media')->where('media_id', $id)->delete();
 
-        return response()->json(['deleted' => true]);
+            return response()->json(['deleted' => true]);
+        });
     }
 
     public function documentsIndex(Request $request): JsonResponse
@@ -1151,7 +1179,7 @@ class CmsContentController extends Controller
             $imageValue = $data['image'] ?? null;
             $values     = [
                 'title'          => trim($data['title']),
-                'author_name'    => $data['author'] ?? null,
+                'author_name'    => trim((string) ($data['author'] ?? '')) ?: request()->user()?->full_name,
                 'excerpt'        => $data['shortDescription'] ?? null,
                 'content'        => $this->sanitizeRichText($data['content'] ?? ''),
                 'status'         => $data['status'],
@@ -1248,7 +1276,7 @@ class CmsContentController extends Controller
         $data = $request->validate([
             'fullName' => ['required', 'string', 'max:150', 'regex:/\S/'],
             'email'    => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($id, 'user_id')],
-            'role'     => ['required', Rule::in(['admin', 'editor'])],
+            'roleId'   => ['required', 'integer', Rule::exists('roles', 'role_id')],
             'status'   => ['required', Rule::in(['active', 'inactive'])],
             'password' => $id === null
                 ? ['required', 'string', 'min:12', 'max:1024']
@@ -1256,9 +1284,6 @@ class CmsContentController extends Controller
         ]);
         $fullName = trim($data['fullName']);
         $nameParts = preg_split('/\s+/', $fullName, 2) ?: [$fullName];
-        $roleName = $data['role'] === 'admin' ? 'Administrator' : 'Editor';
-        $roleId = DB::table('roles')->where('name', $roleName)->value('role_id');
-        abort_unless($roleId, 422, 'The selected role is unavailable.');
         $campusId = DB::table('campuses')->orderBy('campus_id')->value('campus_id');
         abort_unless($campusId, 422, 'A campus is required for users.');
         $values = [
@@ -1266,9 +1291,9 @@ class CmsContentController extends Controller
             'first_name' => $nameParts[0],
             'last_name'  => $nameParts[1] ?? '',
             'campus_id'  => $campusId,
-            'role_id'    => $roleId,
+            'role_id'    => $data['roleId'],
             'email'      => trim($data['email']),
-            'role'       => trim($data['role']),
+            'role'       => null,
             'status'     => $data['status'],
             'updated_at' => now(),
         ];
@@ -1285,7 +1310,22 @@ class CmsContentController extends Controller
             }
             $userId = DB::table('users')->insertGetId($values, 'user_id');
         } else {
-            DB::table('users')->where('user_id', $id)->update($values);
+            $updateResponse = DB::transaction(function () use ($id, $data, $values): ?JsonResponse {
+                $activeAdmins = $this->activeAdministratorIds(true);
+                $newRoleName = (string) DB::table('roles')->where('role_id', $data['roleId'])->value('name');
+                $removesAdmin = $data['status'] !== 'active' || ! $this->isAdministratorRoleName($newRoleName);
+                if ($removesAdmin && count($activeAdmins) <= 1 && in_array($id, $activeAdmins, true)) {
+                    return response()->json([
+                        'message' => 'The final active administrator cannot be deactivated or demoted.',
+                    ], 422);
+                }
+                DB::table('users')->where('user_id', $id)->update($values);
+
+                return null;
+            });
+            if ($updateResponse instanceof JsonResponse) {
+                return $updateResponse;
+            }
             $userId = $id;
         }
 
@@ -1740,7 +1780,7 @@ class CmsContentController extends Controller
             ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
             ->select([
                 'u.user_id as id', 'u.full_name as fullName', 'u.email',
-                DB::raw($this->normalizedUserRoleExpression() . ' as role'), 'u.status',
+                'u.role_id as roleId', 'r.name as role', 'u.status',
             ])
             ->where('u.user_id', $id)
             ->first();
@@ -1751,12 +1791,29 @@ class CmsContentController extends Controller
 
     private function normalizedUserRoleExpression(): string
     {
-        return "COALESCE(NULLIF(u.role, ''), CASE LOWER(COALESCE(r.name, '')) " .
-            "WHEN 'super administrator' THEN 'admin' " .
-            "WHEN 'administrator' THEN 'admin' " .
-            "WHEN 'editor' THEN 'editor' " .
-            "WHEN 'author' THEN 'author' " .
-            "ELSE LOWER(COALESCE(r.name, '')) END)";
+        $role = "LOWER(COALESCE(NULLIF(TRIM(u.role), ''), r.name, ''))";
+
+        return "CASE {$role} WHEN 'super administrator' THEN 'admin' " .
+            "WHEN 'administrator' THEN 'admin' ELSE {$role} END";
+    }
+
+    private function activeAdministratorIds(bool $lockForUpdate = false): array
+    {
+        $query = DB::table('users as u')
+            ->leftJoin('roles as r', 'r.role_id', '=', 'u.role_id')
+            ->where('u.status', 'active')
+            ->whereRaw($this->normalizedUserRoleExpression() . ' = ?', ['admin'])
+            ->orderBy('u.user_id');
+        if ($lockForUpdate) {
+            $query->lockForUpdate();
+        }
+
+        return array_map('intval', $query->pluck('u.user_id')->all());
+    }
+
+    private function isAdministratorRoleName(string $name): bool
+    {
+        return in_array(strtolower(trim($name)), ['admin', 'administrator', 'super administrator'], true);
     }
 
     private function findCollege(int $id): object

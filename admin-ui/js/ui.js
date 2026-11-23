@@ -389,7 +389,7 @@ CMS.ui = (function () {
   }
   /* Campus names the current (simulated) user may target. */
   function campusChoices() {
-    var u = CMS.config.currentUser;
+    var u = CMS.config.currentUser || {};
     if (u.role === 'campus_admin' && u.campus) return [u.campus];
     return [CMS.config.allCampuses].concat(CMS.config.campuses);
   }

@@ -17,12 +17,12 @@
       roles.forEach(function (role) {
         var userCount = Number(role.userCount);
         var rename = el('button', { type: 'button', class: 'cms-btn cms-btn-soft role-edit', text: 'Rename Role' });
-        rename.addEventListener('click', function () { renameRole(role); });
+        if (role.canRename) rename.addEventListener('click', function () { renameRole(role); });
         grid.appendChild(el('article', { class: 'cms-card role-card' }, [
           el('h2', { class: 'role-name', text: role.name }),
           el('p', { class: 'role-desc', text: userCount + (userCount === 1 ? ' user' : ' users') }),
-          rename
-        ]));
+          role.canRename ? rename : null
+        ].filter(Boolean)));
       });
     }).catch(function (error) {
       ui.renderEmpty(grid, { title: 'Unable to load roles', text: error.message });

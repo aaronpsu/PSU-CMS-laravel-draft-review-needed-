@@ -10,15 +10,19 @@ against that database. Other prototype screens still use `localStorage`.
 
 ## Run it
 Run the API from `laravel-admin-api` using `php artisan serve --host 127.0.0.1 --port 8001`.
-In a second terminal at the repo root, run `php -S localhost:8000` and visit
+In a second terminal at the repo root, run `php -S localhost:8000 admin-ui/router.php` and visit
 `http://localhost:8000/admin-ui/`. See [laravel-admin-api/README.md](../laravel-admin-api/README.md)
 for database setup and API details.
+
+The sign-in and initial setup pages are public. Other admin HTML pages are served
+only after the router or Apache access gate verifies the Laravel session.
 
 ## Folder map
 | Path | Purpose |
 |---|---|
 | `news/`, `announcements/`, `events/`, `search/` | One HTML file per screen |
 | `css/cms-*.css` | Shared design tokens, layout and components |
+| `router.php`, `access.php`, `.htaccess` | Verify the Laravel session before serving admin pages |
 | `css/news.css` etc. | Module styles (class prefixes `news-`, `announcement-`, `event-`, `search-`) |
 | `js/config.js` | Feature flags, campus list, categories, page sizes, upload limits |
 | `js/seed-data.js` | Sample data (first run only; never overwrites saved data) |
@@ -90,19 +94,19 @@ Screens: `colleges/`, `departments/`, `programs/`, `users/` (9 screens, matching
 | `js/structure-seed.js` | First-run sample data (colleges, departments, programs, roles, users, extra faculty). |
 | `js/structure-db.js` | Adds `CMS.db.colleges / departments / programs / roles / users` and the shared helpers in `CMS.structure` for the still-local prototype screens. Does **not** edit `storage.js`. |
 | `js/colleges.js`, `programs.js`, `users.js` | College, Academic Program, and User pages connected to Laravel. |
-| `js/roles.js` | Role labels and user counts derived from `users.role`; renaming updates the label on all assigned users. |
+| `js/roles.js` | Roles and assigned-user counts from `roles`; built-in access roles cannot be renamed. |
 | `js/departments.js` | Departments list and form connected to Laravel; uses database colleges and faculty for its selectors. |
 | `js/combobox.js` + `css/cms-combobox.css` | Reusable searchable dropdown (used for Department Head). Any module may reuse it. |
 | `css/structure.css`, `colleges.css`, `departments.css`, `programs.css`, `users.css` | Styles (prefixes `structure-`, `college-`, `department-`, `program-`, `user-`, `role-`). |
 
-The Colleges, Departments, Programs, Campuses, and content categories use database-backed records and relationships. Users store a role label directly; the User Roles screen derives roles from current users and can rename a role for all users assigned to it.
+The Colleges, Departments, Programs, Campuses, and content categories use database-backed records and relationships. Users reference the `roles` table through `role_id`; the User Roles screen lists database roles, including roles with no assigned users.
 
 Notes for the team:
 - The sidebar groups **University Structure** and **User Management** replaced the two placeholder links in every page.
 - These API-backed pages no longer save or display their localStorage sample records.
 - New user passwords are hashed by Laravel and never returned. The API uses a local session-based sign-in; it is still a prototype and should not be exposed or used for real administrator access without a production security review.
 - College logos are uploaded to the schema's Media table. Fields unsupported by the v2 schema (such as college vision or program campus/syllabus) are omitted.
-- The User Roles page cannot create independent roles or configure permissions because the schema has no roles or permissions table.
+- The User Roles page cannot create roles or configure permissions because the schema has no permissions table or role-creation UI. Built-in role names control access and are not editable.
 - The shared header reads per-user notifications and unread counts from `psu_cms_admin.notifications`; unread alerts can be marked as read. Account and Security Settings use the signed-in Laravel session. API mutations include the session CSRF token and are role-protected; the backend remains loopback-only for local development.
 - Document Library supports uploads up to 300 KB (matching the announcement attachment API); Media Library supports image uploads up to 5 MB.
 

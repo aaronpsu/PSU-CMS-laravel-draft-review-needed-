@@ -84,6 +84,16 @@ class ApiRequestSecurityTest extends TestCase
             ->assertStatus(400);
     }
 
+    public function test_authors_can_use_editorial_routes_but_not_admin_routes(): void
+    {
+        $author = new User();
+        $author->forceFill(['user_id' => 2, 'role' => 'Author']);
+
+        $this->actingAs($author, 'web')->getJson('/api/health')->assertOk();
+        $this->getJson('/api/users')->assertForbidden();
+        $this->getJson('/api/site-settings')->assertForbidden();
+    }
+
     private function signInAsAdmin(): void
     {
         $admin = new User();

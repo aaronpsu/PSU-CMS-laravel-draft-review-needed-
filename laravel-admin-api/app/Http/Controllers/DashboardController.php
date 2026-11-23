@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use Closure;
@@ -9,16 +8,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * GET /api/dashboard
  *
- * Read-only aggregates for the admin dashboard. All figures come from cms_db;
-<<<<<<< HEAD
- * nothing is cached or invented. Targets the psu_cms_admin schema. Nothing writes
- * to activity_logs yet, so "recent activity" is derived from created_at/updated_at
- * and created_by (see recentActivity()).
-=======
- * nothing is cached or invented. The schema has no audit-log table, so "recent
- * activity" is derived from created_at/updated_at and the available creator
- * references in the PSU schema.
->>>>>>> baebe517c5a8372fbe02ff7bf16ebdc652c8454a
+ * Read-only aggregates for the psu_cms_admin schema. Nothing writes to
+ * activity_logs yet, so recent activity is derived from record timestamps.
  */
 class DashboardController extends Controller
 {
@@ -29,23 +20,11 @@ class DashboardController extends Controller
         $year = (int) DB::scalar('SELECT YEAR(CURDATE())');
 
         return response()->json([
-            'cards'           => $this->safe('cards', fn () => $this->cards(), []),
-            'chart'           => ['year' => $year, 'series' => $this->safe('chart', fn () => $this->chartSeries($year), [])],
-            'recentPublished' => $this->safe('recentPublished', fn () => $this->recentPublished(), []),
-            'recentActivity'  => $this->safe('recentActivity', fn () => $this->recentActivity(), []),
+            'cards'           => $this->cards(),
+            'chart'           => ['year' => $year, 'series' => $this->chartSeries($year)],
+            'recentPublished' => $this->recentPublished(),
+            'recentActivity'  => $this->recentActivity(),
         ]);
-    }
-
-    /** One broken section must not blank the whole dashboard; log it and return a fallback. */
-    private function safe(string $section, \Closure $fn, mixed $fallback): mixed
-    {
-        try {
-            return $fn();
-        } catch (\Throwable $e) {
-            report($e);
-            logger()->error("Dashboard section '{$section}' failed: " . $e->getMessage());
-            return $fallback;
-        }
     }
 
     private function cards(): array
@@ -65,9 +44,9 @@ class DashboardController extends Controller
     private function chartSeries(int $year): array
     {
         return [
-            'news'          => $this->monthly('news', 'published_at', $year, fn ($q) => $q->where('status', 'published')),
-            'announcements' => $this->monthly('announcements', 'published_at', $year, fn ($q) => $q->where('status', 'published')),
-            'events'        => $this->monthly('events', 'published_at', $year, fn ($q) => $q->whereIn('status', ['published', 'completed'])),
+            'news'          => $this->monthly('news', 'published_at', $year, fn($q) => $q->where('status', 'published')),
+            'announcements' => $this->monthly('announcements', 'published_at', $year, fn($q) => $q->where('status', 'published')),
+            'events'        => $this->monthly('events', 'published_at', $year, fn($q) => $q->whereIn('status', ['published', 'completed'])),
             'documents'     => $this->monthly('documents', 'created_at', $year),
             'other'         => $this->monthly('media', 'created_at', $year),
         ];
@@ -124,7 +103,7 @@ class DashboardController extends Controller
             ->orderByDesc('published_on')
             ->limit(5)
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'type'      => $row->type,
                 'id'        => (int) $row->id,
                 'title'     => $row->title,
@@ -142,26 +121,18 @@ class DashboardController extends Controller
     private function recentActivity(): array
     {
         // psu_cms_admin has no updated_by column and no audit rows are written to
-        // activity_logs, so the actor is the record's creator (created_by).
+        // activity_logs, so use each record's creator where available.
         $sources = [
-<<<<<<< HEAD
             ['news', 'title', 'news', 't.created_by', 't.status', 't.updated_at'],
             ['announcements', 'title', 'announcement', 't.created_by', 't.status', 't.updated_at'],
             ['events', 'title', 'event', 't.created_by', 't.status', 't.updated_at'],
-            ['faculty_staff', "TRIM(CONCAT_WS(' ', t.first_name, t.last_name))", 'personnel', 'NULL', 'NULL', 't.updated_at'],
+            ['faculty_staff', "TRIM(CONCAT_WS(' ', NULLIF(t.first_name, ''), NULLIF(t.middle_name, ''), NULLIF(t.last_name, '')))", 'personnel', 'NULL', 't.status', 't.updated_at'],
             ['documents', 'COALESCE(t.title, t.file_name)', 'document', 't.created_by', 'NULL', 't.created_at'],
-=======
-            ['news', 'news_id', 'title', 'news', 't.created_by', 't.status', 't.updated_at'],
-            ['announcements', 'announcement_id', 'title', 'announcement', 't.created_by', 't.status', 't.updated_at'],
-            ['events', 'event_id', 'title', 'event', 't.created_by', 't.status', 't.updated_at'],
-            ['faculty_staff', 'faculty_id', "CONCAT_WS(' ', NULLIF(t.first_name, ''), NULLIF(t.middle_name, ''), NULLIF(t.last_name, ''))", 'personnel', 'NULL', 't.status', 't.updated_at'],
-            ['documents', 'document_id', 'COALESCE(t.title, t.file_name)', 'document', 't.created_by', 'NULL', 't.created_at'],
->>>>>>> baebe517c5a8372fbe02ff7bf16ebdc652c8454a
         ];
 
         $union = null;
         foreach ($sources as [$table, $titleExpr, $kind, $actorExpr, $statusExpr, $tsColumn]) {
-            $title = str_contains($titleExpr, '(') ? $titleExpr : "t.{$titleExpr}";
+            $title  = str_contains($titleExpr, '(') ? $titleExpr : "t.{$titleExpr}";
             $edited = $tsColumn === 't.updated_at' ? 'TIMESTAMPDIFF(SECOND, t.created_at, t.updated_at)' : '0';
 
             // Everything interpolated here comes from the constant list above.
@@ -185,7 +156,7 @@ class DashboardController extends Controller
             ->orderByDesc('ts')
             ->limit(5)
             ->get()
-            ->map(fn ($row) => [
+            ->map(fn($row) => [
                 'user'       => $row->actor,
                 'activity'   => $this->activityLabel($row),
                 'content'    => $row->title,

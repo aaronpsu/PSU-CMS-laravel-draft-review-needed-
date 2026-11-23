@@ -120,7 +120,7 @@
           <div class="cms-form-row">
             <div class="cms-field">
               <label class="cms-label" for="userRole">Role</label>
-              <input class="cms-input" id="userRole" type="text" maxlength="50" placeholder="Enter role (e.g. editor)">
+              <select class="cms-input" id="userRole" data-cms-select required aria-label="Role"></select>
               <p class="cms-field-error"></p>
             </div>
             <div class="cms-field">
@@ -135,7 +135,7 @@
           <div class="cms-form-row">
             <div class="cms-field">
               <label class="cms-label" for="userPassword">Password</label>
-              <input class="cms-input" id="userPassword" type="password" maxlength="72" placeholder="Enter password" autocomplete="new-password">
+              <input class="cms-input" id="userPassword" type="password" minlength="12" maxlength="72" placeholder="At least 12 characters" autocomplete="new-password">
               <p class="cms-field-error"></p>
             </div>
             <div class="cms-field">
@@ -144,7 +144,7 @@
               <p class="cms-field-error"></p>
             </div>
           </div>
-          <p class="cms-field-hint user-password-note" id="userPasswordHint">Passwords are stored as hashes. This prototype does not provide sign-in or permission checks.</p>
+          <p class="cms-field-hint user-password-note" id="userPasswordHint">Use at least 12 characters. Passwords are stored as hashes.</p>
         </section>
         <div class="cms-form-actions">
           <a class="cms-btn cms-btn-outline" href="all-users.html">Cancel</a>

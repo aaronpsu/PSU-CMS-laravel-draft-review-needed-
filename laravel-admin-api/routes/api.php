@@ -28,7 +28,7 @@ Route::middleware([LocalPrototypeOnly::class, 'web'])
         });
     });
 
-Route::middleware([LocalPrototypeOnly::class, 'web', 'auth:web', 'cms.json', 'cms.role:admin,editor'])
+Route::middleware([LocalPrototypeOnly::class, 'web', 'auth:web', 'cms.json', 'cms.role:admin,editor,author'])
     ->group(function (): void {
     Route::middleware('cms.role:admin')->group(function (): void {
         Route::get('/site-settings', [SiteSettingsController::class, 'index']);

@@ -13,8 +13,6 @@ window.CMS = window.CMS || {};
     { value: 'read', label: 'Read' },
     { value: 'responded', label: 'Responded' }
   ];
-  cfg.feedbackCategories = ['Website', 'Services', 'Facilities', 'Other'];
-
   var STATUS_COLOR = { unread: 'amber', read: 'green', responded: 'blue' };
   function str(value) { return value === null || value === undefined ? '' : String(value); }
 

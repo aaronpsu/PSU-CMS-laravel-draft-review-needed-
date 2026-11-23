@@ -52,7 +52,7 @@
     function load() {
       var request = ++state.request;
       return api.query('/users', {
-        q: search.value.trim(), role: roleFilter.value, status: statusFilter.value
+        q: search.value.trim(), roleId: roleFilter.value, status: statusFilter.value
       }).then(function (rows) {
         if (request !== state.request) return;
         state.rows = rows;
@@ -94,7 +94,7 @@
 
     api.get('/user-roles').then(function (roles) {
       ui.setOptions(roleFilter, [{ value: '', label: 'All Roles' }].concat(roles.map(function (role) {
-        return { value: role.name, label: role.name };
+        return { value: role.roleId, label: role.name };
       })), '');
       roleFilter.addEventListener('change', load);
       statusFilter.addEventListener('change', load);
@@ -122,6 +122,13 @@
     var id = ui.getParam('id');
     var submit = document.getElementById('userSubmit');
 
+    submit.disabled = true;
+    var rolesRequest = api.get('/user-roles').then(function (roles) {
+      ui.setOptions(f.role, roles.map(function (role) {
+        return { value: role.roleId, label: role.name };
+      }), '');
+    });
+
     if (id) {
       document.getElementById('userPageTitle').textContent = 'Edit User';
       document.getElementById('userPageSub').textContent = 'Update this CMS account.';
@@ -129,16 +136,20 @@
       submit.textContent = 'Save Changes';
       document.getElementById('userPasswordHint').textContent = 'Leave both password fields blank to keep the current password.';
       document.title = 'Edit User | PSU CMS';
-      submit.disabled = true;
-      api.get('/users/' + encodeURIComponent(id)).then(function (user) {
+      Promise.all([rolesRequest, api.get('/users/' + encodeURIComponent(id))]).then(function (results) {
+        var user = results[1];
         f.fullName.value = user.fullName;
         f.email.value = user.email;
-        f.role.value = user.role;
+        f.role.value = String(user.roleId);
         f.status.value = user.status;
         if (f.status._cmsRefresh) f.status._cmsRefresh();
       }).catch(function (error) {
         ui.flash(error.message, 'error');
         window.location.href = 'all-users.html';
+      }).finally(function () { submit.disabled = false; });
+    } else {
+      rolesRequest.catch(function (error) {
+        ui.flash(error.message, 'error');
       }).finally(function () { submit.disabled = false; });
     }
 
@@ -152,15 +163,15 @@
       var confirmation = f.confirm.value;
       if (!fullName) validator.fail(f.fullName, 'Enter the full name.');
       if (!email || !S.isEmail(email)) validator.fail(f.email, 'Enter a valid email address.');
-      if (!role) validator.fail(f.role, 'Enter a role.');
-      if (!id && password.length < 8) validator.fail(f.password, 'Use a password with at least 8 characters.');
-      if (password && password.length < 8) validator.fail(f.password, 'Use a password with at least 8 characters.');
+      if (!role) validator.fail(f.role, 'Choose a role.');
+      if (!id && password.length < 12) validator.fail(f.password, 'Use a password with at least 12 characters.');
+      if (password && password.length < 12) validator.fail(f.password, 'Use a password with at least 12 characters.');
       if (password && password.length > 72) validator.fail(f.password, 'Use a password no longer than 72 characters.');
       if ((password || confirmation) && password !== confirmation) validator.fail(f.confirm, 'The passwords do not match.');
       if (!id && !password) validator.fail(f.password, 'Enter a password for the new user.');
       if (!validator.ok()) return;
 
-      var data = { fullName: fullName, email: email, role: role, status: f.status.value };
+      var data = { fullName: fullName, email: email, roleId: Number(role), status: f.status.value };
       if (password) data.password = password;
       submit.disabled = true;
       var save = id ? api.put('/users/' + encodeURIComponent(id), data) : api.post('/users', data);

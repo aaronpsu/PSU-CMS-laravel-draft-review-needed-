@@ -44,7 +44,7 @@ window.CMS = window.CMS || {};
     /* shows the saved name / avatar in the top bar (and the simulated user) */
     applyHeader: function () {
       var acct = CMS.settings.get('account');
-      CMS.config.currentUser.name = acct.fullName;
+      if (CMS.config.currentUser) CMS.config.currentUser.name = acct.fullName;
       var nameEl = document.querySelector('.cms-user-name');
       if (nameEl) nameEl.textContent = acct.fullName;
       var av = document.querySelector('.cms-avatar');

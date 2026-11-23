@@ -59,6 +59,27 @@
   background:var(--cms-bg);
   -webkit-font-smoothing:antialiased;
 }
+.cms-body:not(.cms-authenticated):not(.cms-public-page){visibility:hidden}
+.cms-body.cms-auth-error{
+  display:grid;
+  min-height:100vh;
+  place-items:center;
+  padding:24px;
+  visibility:visible;
+}
+.cms-body.cms-auth-error>.cms-shell{display:none}
+.cms-auth-message{
+  width:min(100%,480px);
+  padding:24px;
+  border:1px solid var(--cms-border);
+  border-radius:var(--cms-radius-lg);
+  background:var(--cms-surface);
+  box-shadow:0 12px 32px rgb(15 23 42 / 10%);
+  visibility:visible;
+}
+.cms-auth-message h1{margin:0 0 8px;font-size:20px}
+.cms-auth-message p{margin:0 0 16px;color:var(--cms-muted)}
+.cms-auth-message-actions{display:flex;gap:8px;align-items:center}
 .cms-body *,.cms-body *::before,.cms-body *::after{box-sizing:border-box}
 :where(.cms-body) a{color:inherit;text-decoration:none}
 :where(.cms-body) :is(h1,h2,h3,p){margin:0}
