@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../css/cms-layout.css">
   <link rel="stylesheet" href="../css/cms-components.css">
   <link rel="stylesheet" href="../css/structure.css">
+  <link rel="stylesheet" href="../css/admin-resources.css">
 </head>
 <body class="cms-body" data-page="personnel">
 <div class="cms-shell">
@@ -51,7 +52,7 @@
         </div>
       </div>
       <div class="cms-nav-group" data-group="faculty">
-        <button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-university"><i class="bi bi-people" aria-hidden="true"></i><span class="cms-nav-text">Faculty &amp; Staff Directory</span><span class="cms-nav-caret" aria-hidden="true"></span></button>
+        <button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-faculty"><i class="bi bi-people" aria-hidden="true"></i><span class="cms-nav-text">Faculty &amp; Staff Directory</span><span class="cms-nav-caret" aria-hidden="true"></span></button>
         <div class="cms-subnav" id="subnav-faculty">
             <a class="cms-nav-link" href="../faculty/index.html" data-nav="personnel"><span class="cms-nav-text">All Personnel</span></a>
         </div>
@@ -98,7 +99,7 @@
           <h1 class="cms-page-title">Faculty &amp; Staff Directory</h1>
           <p class="cms-page-sub">Manage university personnel records.</p>
         </div>
-        <button type="button" class="cms-btn cms-btn-primary" id="facultyAdd">+ Add Personnel</button>
+        <a class="cms-btn cms-btn-primary" id="facultyAdd" href="personnel-form.html">+ Add Personnel</a>
       </div>
       <section class="cms-card" aria-label="Faculty and staff">
         <div class="cms-filters">
@@ -107,16 +108,30 @@
             <input class="cms-input" id="facultySearch" type="search" placeholder="Search name, position, email..." autocomplete="off">
           </div>
           <div>
+            <label class="cms-visually-hidden" for="facultyCollegeFilter">Filter by college</label>
+            <select class="cms-input" id="facultyCollegeFilter" data-cms-select aria-label="Filter by college">
+              <option value="">All Colleges</option>
+            </select>
+          </div>
+          <div>
             <label class="cms-visually-hidden" for="facultyDepartmentFilter">Filter by department</label>
             <select class="cms-input" id="facultyDepartmentFilter" data-cms-select aria-label="Filter by department">
               <option value="">All Departments</option>
             </select>
           </div>
+          <div>
+            <label class="cms-visually-hidden" for="facultyStatusFilter">Filter by status</label>
+            <select class="cms-input" id="facultyStatusFilter" data-cms-select aria-label="Filter by status">
+              <option value="">All Statuses</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </div>
         </div>
         <div class="cms-table-wrap" id="facultyTableWrap">
-          <table class="cms-table">
+          <table class="cms-table res-table res-personnel-table">
             <thead>
-              <tr><th scope="col">Name</th><th scope="col">Position</th><th scope="col">Department</th><th scope="col">Email</th><th scope="col">Actions</th></tr>
+              <tr><th scope="col">Photo</th><th scope="col">Name</th><th scope="col">Position</th><th scope="col">College</th><th scope="col">Department</th><th scope="col">Email</th><th scope="col">Status</th><th scope="col">Actions</th></tr>
             </thead>
             <tbody id="facultyTableBody"></tbody>
           </table>

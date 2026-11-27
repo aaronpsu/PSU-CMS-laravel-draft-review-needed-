@@ -1,0 +1,148 @@
+.people-directory {
+  padding-top: var(--sp-4);
+  padding-bottom: var(--sp-7);
+}
+
+.people-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) repeat(2, minmax(180px, 240px));
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+}
+
+.people-search,
+.people-select {
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: 400 15px/1.4 var(--font);
+}
+
+.people-search:focus,
+.people-select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: var(--focus);
+}
+
+.people-empty {
+  padding: var(--sp-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  text-align: center;
+}
+
+.people-empty h2 {
+  margin: 0 0 var(--sp-1);
+  font-size: 20px;
+  color: var(--text);
+}
+
+.people-empty p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.people-prototype-note {
+  margin: 0 0 var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-left: 4px solid var(--accent);
+  background: var(--primary-tint);
+  color: var(--primary-dark);
+  font-size: 14px;
+}
+
+.profile-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: var(--sp-4);
+  align-items: start;
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.profile-card,
+.profile-main {
+  min-width: 0;
+}
+
+.profile-card {
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.profile-avatar {
+  display: grid;
+  width: 112px;
+  height: 112px;
+  margin: 0 auto var(--sp-2);
+  place-items: center;
+  border-radius: 50%;
+  background: var(--primary-tint);
+  color: var(--primary-dark);
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.profile-name {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.profile-role,
+.profile-unit {
+  margin: var(--sp-1) 0 0;
+  color: var(--text-muted);
+}
+
+.profile-main h2 {
+  margin: 0 0 var(--sp-2);
+  color: var(--text);
+  font-size: 28px;
+}
+
+.profile-main h3 {
+  margin: var(--sp-4) 0 var(--sp-1);
+  color: var(--text);
+  font-size: 18px;
+}
+
+.profile-main p,
+.profile-main li {
+  color: var(--text-muted);
+  line-height: 1.65;
+}
+
+.profile-main p {
+  margin: 0;
+}
+
+.profile-main a {
+  color: var(--primary);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 760px) {
+  .people-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-card {
+    max-width: 360px;
+    margin: 0 auto;
+  }
+}

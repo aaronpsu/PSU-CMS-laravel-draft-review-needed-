@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Add Personnel | PSU CMS</title>
+  <link rel="stylesheet" href="../vendor/bootstrap/bootstrap.min.css">
+  <link rel="stylesheet" href="../vendor/bootstrap-icons/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../css/cms-base.css">
+  <link rel="stylesheet" href="../css/cms-layout.css">
+  <link rel="stylesheet" href="../css/cms-components.css">
+  <link rel="stylesheet" href="../css/structure.css">
+  <link rel="stylesheet" href="../css/admin-resources.css">
+</head>
+<body class="cms-body" data-page="personnel-form">
+<div class="cms-shell">
+  <aside class="cms-sidebar" id="cmsSidebar" aria-label="Sidebar">
+    <a class="cms-brand" href="../index.html"><img class="cms-brand-logo" src="../assets/images/psu-logo.png" alt=""><span class="cms-brand-text"><strong>PSU CMS</strong><small>Administration Panel</small></span></a>
+    <nav aria-label="Main navigation">
+      <p class="cms-nav-label">Main</p>
+      <a class="cms-nav-link" href="../dashboard/dashboard.html" data-nav="dashboard"><i class="bi bi-columns-gap" aria-hidden="true"></i><span class="cms-nav-text">Dashboard</span></a>
+      <p class="cms-nav-label">Website content</p>
+      <div class="cms-nav-group" data-group="faculty"><button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-faculty"><i class="bi bi-people" aria-hidden="true"></i><span class="cms-nav-text">Faculty &amp; Staff Directory</span><span class="cms-nav-caret" aria-hidden="true"></span></button><div class="cms-subnav" id="subnav-faculty"><a class="cms-nav-link" href="index.html" data-nav="personnel"><span class="cms-nav-text">All Personnel</span></a></div></div>
+      <p class="cms-nav-label">Resources</p>
+      <a class="cms-nav-link" href="../resources/library.html?type=documents" data-nav="documents"><i class="bi bi-file-earmark-text" aria-hidden="true"></i><span class="cms-nav-text">Document Library</span></a>
+      <a class="cms-nav-link" href="../resources/library.html?type=media" data-nav="media"><i class="bi bi-image" aria-hidden="true"></i><span class="cms-nav-text">Media Library</span></a>
+      <a class="cms-nav-link" href="../resources/library.html?type=categories" data-nav="document-categories"><i class="bi bi-folder" aria-hidden="true"></i><span class="cms-nav-text">Document Categories</span></a>
+      <p class="cms-nav-label">System</p>
+      <div class="cms-nav-group" data-group="settings"><button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-settings"><i class="bi bi-sliders" aria-hidden="true"></i><span class="cms-nav-text">Settings</span><span class="cms-nav-caret" aria-hidden="true"></span></button><div class="cms-subnav" id="subnav-settings"><a class="cms-nav-link" href="../system/system-gen.html" data-nav="general-settings"><span class="cms-nav-text">General Settings</span></a><a class="cms-nav-link" href="../system/system-web-info.html" data-nav="website-information"><span class="cms-nav-text">Website Information</span></a><a class="cms-nav-link" href="../settings/account-settings.html" data-nav="account-settings"><span class="cms-nav-text">Account Settings</span></a><a class="cms-nav-link" href="../settings/security-settings.html" data-nav="security-settings"><span class="cms-nav-text">Security Settings</span></a></div></div>
+      <div class="cms-nav-group" data-group="appearance"><button type="button" class="cms-nav-link cms-nav-toggle" aria-expanded="false" aria-controls="subnav-appearance"><i class="bi bi-palette" aria-hidden="true"></i><span class="cms-nav-text">Appearance</span><span class="cms-nav-caret" aria-hidden="true"></span></button><div class="cms-subnav" id="subnav-appearance"><a class="cms-nav-link" href="../settings/theme-settings.html" data-nav="theme-settings"><span class="cms-nav-text">Theme Settings</span></a><a class="cms-nav-link" href="../settings/website-layout.html" data-nav="website-layout"><span class="cms-nav-text">Website Layout</span></a></div></div>
+    </nav>
+  </aside>
+  <div class="cms-backdrop"></div>
+  <div class="cms-main">
+    <header class="cms-topbar">
+      <button type="button" class="cms-menu-toggle" aria-label="Open menu" aria-controls="cmsSidebar" aria-expanded="false"><i class="bi bi-list" aria-hidden="true"></i></button>
+      <nav class="cms-breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../index.html">Home</a></li><li>Website content</li><li><a href="index.html">Faculty &amp; Staff Directory</a></li><li aria-current="page" id="personnelCrumb">Add Personnel</li></ol></nav>
+      <div class="cms-topbar-right">
+        <button type="button" class="cms-search-toggle" aria-label="Search" aria-expanded="false"><i class="bi bi-search" aria-hidden="true"></i></button>
+        <form class="cms-search" role="search" action="../search/search-results.html" method="get"><label class="cms-visually-hidden" for="cmsGlobalSearch">Search the website</label><input type="search" id="cmsGlobalSearch" name="q" placeholder="Search..." autocomplete="off"><button type="submit" class="cms-search-btn" aria-label="Search"><i class="bi bi-search" aria-hidden="true"></i></button></form>
+        <button type="button" class="cms-notif" aria-label="Notifications"><i class="bi bi-bell" aria-hidden="true"></i><span class="cms-notif-text">Notifications</span></button>
+        <a class="cms-btn cms-btn-outline" href="../../index.php" target="_blank" rel="noopener"><span class="cms-view-site-text">View Website</span><i class="bi bi-box-arrow-up-right cms-view-site-icon" aria-hidden="true"></i></a>
+        <button type="button" class="cms-user" aria-label="Account"><span class="cms-avatar" aria-hidden="true"></span><span class="cms-user-name">No active session</span><span class="cms-user-caret" aria-hidden="true"></span></button>
+      </div>
+    </header>
+    <main class="cms-content" id="main">
+      <div class="cms-page-head">
+        <div><h1 class="cms-page-title" id="personnelHeading">Add Personnel</h1><p class="cms-page-sub">Add or update a faculty or staff member in the database.</p></div>
+        <a class="cms-btn cms-btn-outline" href="index.html"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back</a>
+      </div>
+      <form id="personnelForm" novalidate>
+        <section class="cms-card cms-form-card" aria-label="Personnel details">
+          <div class="cms-field">
+            <span class="cms-label">Profile Picture</span>
+            <div class="cms-upload res-upload-row">
+              <div class="res-photo-preview" id="photoPreview"><i class="bi bi-person" aria-hidden="true"></i></div>
+              <div><label class="cms-btn cms-btn-soft" for="personPhoto">Upload Image</label><input class="cms-visually-hidden" id="personPhoto" type="file" accept="image/jpeg,image/png,image/gif,image/webp"><button class="cms-btn cms-btn-outline" type="button" id="removePhoto">Remove Image</button><p class="cms-field-hint">JPEG, PNG, GIF or WEBP; up to 5 MB.</p></div>
+            </div>
+            <p class="cms-field-error res-photo-error" id="photoError"></p>
+          </div>
+          <div class="cms-form-row">
+            <div class="cms-field"><label class="cms-label cms-required" for="personFirstName">First Name</label><input class="cms-input" id="personFirstName" type="text" maxlength="80" required><p class="cms-field-error"></p></div>
+            <div class="cms-field"><label class="cms-label" for="personMiddleName">Middle Name</label><input class="cms-input" id="personMiddleName" type="text" maxlength="80"><p class="cms-field-error"></p></div>
+          </div>
+          <div class="cms-form-row">
+            <div class="cms-field"><label class="cms-label cms-required" for="personLastName">Last Name</label><input class="cms-input" id="personLastName" type="text" maxlength="80" required><p class="cms-field-error"></p></div>
+            <div class="cms-field"><label class="cms-label cms-required" for="personPosition">Position / Designation</label><input class="cms-input" id="personPosition" type="text" maxlength="150" required><p class="cms-field-error"></p></div>
+          </div>
+          <div class="cms-form-row">
+            <div class="cms-field"><label class="cms-label cms-required" for="personCampus">Campus</label><select class="cms-input" id="personCampus" data-cms-select data-block required></select><p class="cms-field-error"></p></div>
+            <div class="cms-field"><label class="cms-label" for="personCollege">College</label><select class="cms-input" id="personCollege" data-cms-select data-block></select><p class="cms-field-error"></p></div>
+          </div>
+          <div class="cms-form-row">
+            <div class="cms-field"><label class="cms-label" for="personDepartment">Department</label><select class="cms-input" id="personDepartment" data-cms-select data-block></select><p class="cms-field-error"></p></div>
+            <div class="cms-field"><label class="cms-label" for="personStatus">Status</label><select class="cms-input" id="personStatus" data-cms-select data-block><option value="active">Active</option><option value="inactive">Inactive</option></select><p class="cms-field-error"></p></div>
+          </div>
+          <div class="cms-form-row">
+            <div class="cms-field"><label class="cms-label" for="personEmail">Email Address</label><input class="cms-input" id="personEmail" type="email" maxlength="150"><p class="cms-field-error"></p></div>
+            <div class="cms-field"><label class="cms-label" for="personPhone">Contact Number</label><input class="cms-input" id="personPhone" type="tel" maxlength="30"><p class="cms-field-error"></p></div>
+          </div>
+          <div class="cms-field"><label class="cms-label" for="personEducation">Educational Background</label><textarea class="cms-textarea" id="personEducation" rows="3" maxlength="5000"></textarea><p class="cms-field-error"></p></div>
+          <div class="cms-field"><label class="cms-label" for="personBiography">Short Biography</label><textarea class="cms-textarea" id="personBiography" rows="4" maxlength="10000"></textarea><p class="cms-field-error"></p></div>
+        </section>
+        <div class="cms-form-actions"><a class="cms-btn cms-btn-outline" href="index.html">Cancel</a><button class="cms-btn cms-btn-primary" type="submit" id="personSave">Save Personnel</button></div>
+      </form>
+    </main>
+  </div>
+</div>
+<script src="../vendor/bootstrap/bootstrap.bundle.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="../js/ui.js"></script>
+<script src="../js/layout.js"></script>
+<script src="../js/api-client.js"></script>
+<script src="../js/faculty-form.js"></script>
+</body>
+</html>

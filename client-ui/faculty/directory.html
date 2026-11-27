@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Faculty &amp; Staff Directory | Pangasinan State University</title>
+  <meta name="description" content="Browse the Faculty and Staff Directory of Pangasinan State University.">
+  <link rel="icon" href="../assets/images/psu-logo.png" type="image/png">
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/header.css">
+  <link rel="stylesheet" href="../css/footer.css">
+  <link rel="stylesheet" href="../css/people.css">
+  <script src="../js/header.js" defer></script>
+  <script src="../js/includes.js" defer></script>
+</head>
+<body data-root="../../" data-nav="faculty">
+  <div data-include="header"></div>
+  <main id="main">
+    <section class="page-head">
+      <div class="container">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../index.php">Home</a></li><li aria-current="page">Faculty &amp; Staff</li></ol></nav>
+        <h1 class="page-title">Faculty &amp; Staff Directory</h1>
+        <p class="page-lead">Find faculty members and staff by name, department, or specialization.</p>
+      </div>
+    </section>
+    <section class="container people-directory" aria-label="Faculty and staff directory">
+      <p class="people-prototype-note">UI preview only. Directory data and search are not connected yet.</p>
+      <form class="people-toolbar" role="search">
+        <label class="visually-hidden" for="people-search">Search by name, department, or specialization</label>
+        <input class="people-search" id="people-search" type="search" placeholder="Search by name, department, or specialization" disabled>
+        <label class="visually-hidden" for="people-department">Filter by department</label>
+        <select class="people-select" id="people-department" disabled><option>All departments</option></select>
+        <label class="visually-hidden" for="people-campus">Filter by campus</label>
+        <select class="people-select" id="people-campus" disabled><option>All campuses</option></select>
+      </form>
+      <div class="people-empty" role="status">
+        <h2>Directory preview</h2>
+        <p>Faculty and staff records will appear here when a public data connection is available.</p>
+      </div>
+    </section>
+  </main>
+  <div data-include="footer"></div>
+</body>
+</html>

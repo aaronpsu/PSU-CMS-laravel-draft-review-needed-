@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Document Library | Pangasinan State University</title>
+  <meta name="description" content="Browse documents from Pangasinan State University.">
+  <link rel="icon" href="../assets/images/psu-logo.png" type="image/png">
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/header.css">
+  <link rel="stylesheet" href="../css/footer.css">
+  <link rel="stylesheet" href="../css/resources.css">
+  <script src="../js/header.js" defer></script>
+  <script src="../js/includes.js" defer></script>
+</head>
+<body data-root="../../" data-nav="resources">
+  <div data-include="header"></div>
+  <main id="main">
+    <section class="page-head">
+      <div class="container">
+        <nav class="breadcrumb" aria-label="Breadcrumb"><ol><li><a href="../../index.php">Home</a></li><li>Resources</li><li aria-current="page">Documents</li></ol></nav>
+        <h1 class="page-title">Document Library</h1>
+        <p class="page-lead">Browse official forms, policies, reports, and memoranda.</p>
+      </div>
+    </section>
+    <section class="container resource-directory" aria-label="Public document library">
+      <p class="resource-prototype-note">UI preview only. Public document listings and downloads are not connected.</p>
+      <form class="resource-toolbar" role="search">
+        <label class="visually-hidden" for="document-search">Search documents by title</label>
+        <input class="resource-search" id="document-search" type="search" placeholder="Search by title" disabled>
+        <label class="visually-hidden" for="document-category">Filter by category</label>
+        <select class="resource-select" id="document-category" disabled><option>All categories</option></select>
+        <label class="visually-hidden" for="document-date">Filter by upload date</label>
+        <select class="resource-select" id="document-date" disabled><option>Any upload date</option></select>
+      </form>
+      <div class="resource-empty" role="status">
+        <h2>Document library preview</h2>
+        <p>Published documents will appear here when a public data connection is available.</p>
+      </div>
+    </section>
+  </main>
+  <div data-include="footer"></div>
+</body>
+</html>

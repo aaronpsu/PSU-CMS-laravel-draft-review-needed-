@@ -7,18 +7,20 @@ function public_content_rows(PDO $pdo, string $type = '', string $query = ''): a
     $sql = "
         SELECT 'news' AS type, n.news_id AS id, n.title, COALESCE(n.excerpt, '') AS summary,
             COALESCE(n.content, '') AS body, n.published_at AS display_date, n.created_at,
-            m.file_path AS image_path, NULL AS link_url
+            CONCAT('/api/public/media/', m.media_id) AS image_path, NULL AS link_url
         FROM news n
         LEFT JOIN media m ON m.media_id = n.cover_media_id
         WHERE n.status = 'published'
         UNION ALL
         SELECT 'announcements', a.announcement_id, a.title, COALESCE(a.content, ''),
-            COALESCE(a.content, ''), a.published_at, a.created_at, NULL, NULL
+            COALESCE(a.content, ''), a.published_at, a.created_at, NULL,
+            CASE WHEN d.document_id IS NULL THEN NULL ELSE CONCAT('/api/public/documents/', d.document_id) END
         FROM announcements a
+        LEFT JOIN documents d ON d.document_id = a.attachment_document_id AND d.access_level = 'public'
         WHERE a.status = 'published' AND (a.expires_at IS NULL OR a.expires_at >= NOW())
         UNION ALL
         SELECT 'events', e.event_id, e.title, COALESCE(e.description, ''),
-            COALESCE(e.description, ''), e.start_at, e.created_at, m.file_path, NULL
+            COALESCE(e.description, ''), e.start_at, e.created_at, CONCAT('/api/public/media/', m.media_id), NULL
         FROM events e
         LEFT JOIN media m ON m.media_id = e.cover_media_id
         WHERE e.status = 'published'
@@ -29,7 +31,7 @@ function public_content_rows(PDO $pdo, string $type = '', string $query = ''): a
         WHERE p.status = 'published'
         UNION ALL
         SELECT 'colleges', c.college_id, c.name, '',
-            '', c.created_at, c.created_at, m.file_path, NULL
+            '', c.created_at, c.created_at, CONCAT('/api/public/media/', m.media_id), NULL
         FROM colleges c
         LEFT JOIN media m ON m.media_id = c.logo_media_id
         WHERE c.status = 'active'
@@ -47,13 +49,13 @@ function public_content_rows(PDO $pdo, string $type = '', string $query = ''): a
         SELECT 'directory', f.faculty_id,
             TRIM(CONCAT_WS(' ', f.first_name, NULLIF(f.middle_name, ''), f.last_name)),
             COALESCE(f.position, ''), COALESCE(f.biography, ''), f.created_at, f.created_at,
-            m.file_path, NULL
+            CONCAT('/api/public/media/', m.media_id), NULL
         FROM faculty_staff f
         LEFT JOIN media m ON m.media_id = f.photo_media_id
         WHERE f.status = 'active'
         UNION ALL
         SELECT 'documents', d.document_id, d.title, '',
-            '', d.created_at, d.created_at, NULL, NULL
+            '', d.created_at, d.created_at, NULL, CONCAT('/api/public/documents/', d.document_id)
         FROM documents d
         WHERE d.access_level = 'public'
     ";
@@ -83,20 +85,24 @@ function public_content_item(PDO $pdo, string $type, int $id): ?array
 {
     $queries = [
         'news' => "SELECT n.news_id AS id, n.title, n.excerpt AS summary, n.content AS body,
-            n.published_at AS display_date, n.created_at, m.file_path AS image_path
+            n.published_at AS display_date, n.created_at, CONCAT('/api/public/media/', m.media_id) AS image_path,
+            NULL AS link_url
             FROM news n LEFT JOIN media m ON m.media_id = n.cover_media_id
             WHERE n.news_id = ? AND n.status = 'published'",
         'announcements' => "SELECT a.announcement_id AS id, a.title, '' AS summary, a.content AS body,
-            a.published_at AS display_date, a.created_at, NULL AS image_path
+            a.published_at AS display_date, a.created_at, NULL AS image_path,
+            CASE WHEN d.document_id IS NULL THEN NULL ELSE CONCAT('/api/public/documents/', d.document_id) END AS link_url
             FROM announcements a
+            LEFT JOIN documents d ON d.document_id = a.attachment_document_id AND d.access_level = 'public'
             WHERE a.announcement_id = ? AND a.status = 'published'
                 AND (a.expires_at IS NULL OR a.expires_at >= NOW())",
         'events' => "SELECT e.event_id AS id, e.title, '' AS summary, e.description AS body,
-            e.start_at AS display_date, e.created_at, m.file_path AS image_path
+            e.start_at AS display_date, e.created_at, CONCAT('/api/public/media/', m.media_id) AS image_path,
+            NULL AS link_url
             FROM events e LEFT JOIN media m ON m.media_id = e.cover_media_id
             WHERE e.event_id = ? AND e.status = 'published'",
         'pages' => "SELECT page_id AS id, title, '' AS summary, content AS body,
-            published_at AS display_date, created_at, NULL AS image_path
+            published_at AS display_date, created_at, NULL AS image_path, NULL AS link_url
             FROM pages WHERE page_id = ? AND status = 'published'",
     ];
 
@@ -110,10 +116,31 @@ function public_content_item(PDO $pdo, string $type, int $id): ?array
     return $item ?: null;
 }
 
+function public_api_url(string $path): ?string
+{
+    if (!preg_match('#^/api/public/(?:media|documents)/[1-9][0-9]*$#D', $path)) {
+        return null;
+    }
+
+    $host = (string) ($_SERVER['SERVER_NAME'] ?? '127.0.0.1');
+    if (filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+        $host = '[' . $host . ']';
+    } elseif (!preg_match('/\A[a-z0-9.-]+\z/iD', $host)) {
+        return null;
+    }
+    $scheme = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http';
+
+    return $scheme . '://' . $host . ':8001' . $path;
+}
+
 function public_asset_url(?string $path, string $folder): ?string
 {
     if ($path === null || $path === '') {
         return null;
+    }
+    if (($folder === 'media' && preg_match('#^/api/public/media/[1-9][0-9]*$#D', $path))
+        || ($folder === 'docs' && preg_match('#^/api/public/documents/[1-9][0-9]*$#D', $path))) {
+        return public_api_url($path);
     }
     $relative = ltrim($path, '/');
     if (!in_array($folder, ['media', 'docs'], true)
@@ -250,6 +277,8 @@ if($itemId!==false) {
     if($itemImage) echo '<img class="cover" src="'.h($itemImage).'" alt="">';
     if(!empty($item['summary'])) echo '<p>'.h($item['summary']).'</p>';
     echo '<div class="prose">'.nl2br(h($item['body']??'')).'</div>';
+    $link=public_asset_url($item['link_url']??null,'docs');
+    if($link) echo '<p><a class="button secondary" href="'.h($link).'" download>Download document</a></p>';
     echo '</article>';
     site_footer();
     exit;
@@ -279,6 +308,8 @@ else {
     if($buttonLabel!=='') echo '<p><a class="button" href="index.php?contact=1">'.h($buttonLabel).'</a></p>';
     echo '<form class="search" method="get"><input name="q" placeholder="Search campus content" aria-label="Search campus content" maxlength="100"><button>Search</button></form></section>';
 
+    $homeSections=[];
+    ob_start();
     $universityIntroduction=trim(preg_replace('/\s+/', ' ', strip_tags((string)($homepageSettings['university_introduction']??'')))??'');
     $aboutPsu=trim(preg_replace('/\s+/', ' ', strip_tags((string)($homepageSettings['about_psu']??'')))??'');
     if($universityIntroduction!==''||$aboutPsu!=='') {
@@ -287,7 +318,9 @@ else {
         if($aboutPsu!=='') echo '<h2>About PSU</h2><p>'.h($aboutPsu).'</p>';
         echo '</section>';
     }
+    $homeSections['about']=ob_get_clean();
 
+    ob_start();
     $bannerQuery=$pdo->query("SELECT banner_id, title, subtitle, button_label, button_url FROM homepage_banners WHERE is_active = 1 ORDER BY sort_order, banner_id");
     $banners=$bannerQuery->fetchAll();
     foreach($banners as $banner) {
@@ -299,7 +332,9 @@ else {
         }
         echo '</div></section>';
     }
+    $homeSections['banner']=ob_get_clean();
 
+    ob_start();
     $featuredQuery=$pdo->query("SELECT content_type, content_id, section_title FROM homepage_featured_items WHERE is_active = 1 ORDER BY sort_order, featured_item_id LIMIT 12");
     $featuredGroups=[];
     foreach($featuredQuery->fetchAll() as $featured) {
@@ -323,16 +358,81 @@ else {
         }
         echo '</div>';
     }
+    $homeSections['featured_news']=ob_get_clean();
 
+    $homeRows=['news'=>[],'announcements'=>[],'events'=>[]];
+    $homeSections['announcements']='';
+    $homeSections['events']='';
     $featuredContent=$homepageSettings['featured_content']??'';
-    $updateType=['latest-news'=>'news','latest-announcements'=>'announcements','upcoming-events'=>'events'][$featuredContent]??'updates';
-    $rows=public_content_rows($pdo,$updateType);
-    if($featuredContent==='upcoming-events') {
-        $rows=array_values(array_filter($rows,static fn(array $row): bool => !empty($row['display_date'])&&strtotime((string)$row['display_date'])>=time()));
+    $selectedType=['latest-news'=>'news','latest-announcements'=>'announcements','upcoming-events'=>'events'][$featuredContent]??null;
+    if($selectedType!==null) {
+        $selectedRows=public_content_rows($pdo,$selectedType);
+        if($selectedType==='events') {
+            $selectedRows=array_values(array_filter($selectedRows,static fn(array $row): bool => !empty($row['display_date'])&&strtotime((string)$row['display_date'])>=time()));
+        }
+        $homeRows[$selectedType]=array_slice($selectedRows,0,9);
+    } else {
+        foreach(array_keys($homeRows) as $key) {
+            $sectionRows=public_content_rows($pdo,$key);
+            if($key==='events') {
+                $sectionRows=array_values(array_filter($sectionRows,static fn(array $row): bool => !empty($row['display_date'])&&strtotime((string)$row['display_date'])>=time()));
+            }
+            $homeRows[$key]=array_slice($sectionRows,0,3);
+        }
     }
-    $rows=array_slice($rows,0,9);
-    $browseType=$updateType==='updates'?'news':$updateType;
-    echo '<div id="campus-updates" class="section-head"><h2>'.($updateType==='updates'?'Campus updates':'Latest '.h($types[$updateType]??'content')).'</h2><a href="index.php?type='.h($browseType).'">Browse '.h(strtolower($types[$browseType]??'content')).'</a></div>';
+    $renderHomeCards=static function(array $items) use ($types): string {
+        if(!$items) return '';
+        ob_start();
+        echo '<div class="cards">';
+        foreach($items as $item) {
+            echo '<article class="card">';
+            $image=public_asset_url($item['image_path']??null,'media');
+            if($image) echo '<img src="'.h($image).'" alt="">';
+            $title='<h2>'.h($item['title']).'</h2>';
+            if(in_array($item['type'],['news','announcements','events','pages'],true)) {
+                $title='<h2><a href="index.php?type='.rawurlencode($item['type']).'&amp;item='.(int)$item['id'].'">'.h($item['title']).'</a></h2>';
+            }
+            $summary=trim(strip_tags((string)($item['summary']?:$item['body'])));
+            echo '<div class="card-in"><span class="eyebrow">'.h($types[$item['type']]??$item['type']).'</span>'.$title.'<p>'.h(mb_substr($summary,0,170)).'</p>';
+            $link=public_asset_url($item['link_url']??null,'docs');
+            if($link) echo '<p><a class="button secondary" href="'.h($link).'" download>Download document</a></p>';
+            $date=$item['display_date']?:$item['created_at'];
+            if($date) echo '<div class="meta">'.h(date('M j, Y',strtotime($date))).'</div>';
+            echo '</div></article>';
+        }
+        echo '</div>';
+        return (string)ob_get_clean();
+    };
+    foreach([
+        'news'=>['featured_news','Latest News','news'],
+        'announcements'=>['announcements','Announcements','announcements'],
+        'events'=>['events','Upcoming Events','events'],
+    ] as $key=>$section) {
+        if($homeRows[$key]) {
+            $homeSections[$section[0]].='<div class="section-head"><h2>'.h($section[1]).'</h2><a href="index.php?type='.h($section[2]).'">Browse '.h(strtolower($section[1])).'</a></div>'.$renderHomeCards($homeRows[$key]);
+        } elseif(!isset($homeSections[$section[0]])) {
+            $homeSections[$section[0]]='';
+        }
+    }
+
+    $sectionOrder=$siteSettings['homepage_section_order']??null;
+    if(is_string($sectionOrder)) $sectionOrder=json_decode($sectionOrder,true);
+    $allowedSections=['banner','featured_news','announcements','events','about'];
+    $validOrder=is_array($sectionOrder)&&count($sectionOrder)===count($allowedSections);
+    if($validOrder) {
+        $seenSections=[];
+        foreach($sectionOrder as $sectionKey) {
+            if(!is_string($sectionKey)||!in_array($sectionKey,$allowedSections,true)||in_array($sectionKey,$seenSections,true)) {
+                $validOrder=false;
+                break;
+            }
+            $seenSections[]=$sectionKey;
+        }
+    }
+    if(!$validOrder) $sectionOrder=$allowedSections;
+    foreach($sectionOrder as $sectionKey) echo $homeSections[$sectionKey]??'';
+    site_footer();
+    exit;
 }
 echo '<div class="cards">';
 foreach($rows as $r) {

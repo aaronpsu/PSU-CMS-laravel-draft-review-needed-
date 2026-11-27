@@ -64,6 +64,43 @@ class SiteSettingsTest extends TestCase
         $this->assertDatabaseCount('site_settings', 0);
     }
 
+    public function test_website_layout_settings_are_saved_as_database_settings(): void
+    {
+        $csrfToken = $this->signInAsAdmin();
+        $order = ['banner', 'featured_news', 'announcements', 'events', 'about'];
+
+        $this->withHeader('X-CSRF-TOKEN', $csrfToken)->putJson('/api/site-settings', [
+            'settings' => [
+                'header_layout' => 'logo-left',
+                'footer_layout' => 'two-columns',
+                'menu_layout' => 'compact',
+                'homepage_section_order' => $order,
+            ],
+        ])->assertOk()
+            ->assertJsonPath('data.header_layout', 'logo-left')
+            ->assertJsonPath('data.footer_layout', 'two-columns')
+            ->assertJsonPath('data.menu_layout', 'compact')
+            ->assertJsonPath('data.homepage_section_order', $order);
+
+        $this->assertDatabaseHas('site_settings', [
+            'setting_key' => 'homepage_section_order',
+            'setting_value' => json_encode($order),
+        ]);
+    }
+
+    public function test_invalid_website_layout_section_order_is_rejected(): void
+    {
+        $csrfToken = $this->signInAsAdmin();
+
+        $this->withHeader('X-CSRF-TOKEN', $csrfToken)->putJson('/api/site-settings', [
+            'settings' => [
+                'homepage_section_order' => ['banner', 'banner', 'announcements', 'events', 'about'],
+            ],
+        ])->assertUnprocessable();
+
+        $this->assertDatabaseCount('site_settings', 0);
+    }
+
     public function test_site_settings_require_an_authenticated_administrator(): void
     {
         $this->getJson('/api/site-settings')->assertUnauthorized();

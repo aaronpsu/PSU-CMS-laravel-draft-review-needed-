@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="../css/cms-layout.css">
   <link rel="stylesheet" href="../css/cms-components.css">
   <link rel="stylesheet" href="../css/structure.css">
+  <link rel="stylesheet" href="../css/admin-resources.css">
 </head>
 <body class="cms-body" data-page="resource-library">
 <div class="cms-shell">
@@ -109,13 +110,24 @@
     <main class="cms-content" id="main">
       <div class="cms-page-head">
         <div><h1 class="cms-page-title" id="resourceTitle">Resource Library</h1><p class="cms-page-sub" id="resourceSubtitle"></p></div>
-        <button type="button" class="cms-btn cms-btn-primary" id="resourceUpload">+ Upload</button>
+        <div class="res-page-actions">
+          <a class="cms-btn cms-btn-outline" id="resourceCategories" href="library.html?type=categories" hidden>Document Categories</a>
+          <a class="cms-btn cms-btn-primary" id="resourceUpload" href="upload-document.html">+ Upload</a>
+        </div>
       </div>
       <section class="cms-card" aria-label="Resource library">
-        <div class="cms-filters"><div class="cms-filter-search"><label class="cms-visually-hidden" for="resourceSearch">Search files</label><input class="cms-input" id="resourceSearch" type="search" placeholder="Search..." autocomplete="off"></div></div>
+        <div class="cms-filters" id="resourceFilters">
+          <div class="cms-filter-search"><label class="cms-visually-hidden" for="resourceSearch">Search files</label><input class="cms-input" id="resourceSearch" type="search" placeholder="Search..." autocomplete="off"></div>
+          <div id="resourceCategoryFilterWrap" hidden><select class="cms-input" id="resourceCategoryFilter" data-cms-select aria-label="Filter by document category"></select></div>
+          <div id="resourceTypeFilterWrap" hidden><select class="cms-input" id="resourceTypeFilter" data-cms-select aria-label="Filter by file type"></select></div>
+          <div id="resourceViewFilterWrap" hidden><select class="cms-input" id="resourceViewFilter" data-cms-select aria-label="Media view">
+            <option value="grid">Grid View</option><option value="list">List View</option>
+          </select></div>
+        </div>
         <div class="cms-table-wrap" id="resourceTableWrap"><table class="cms-table structure-table">
           <thead><tr id="resourceHead"></tr></thead><tbody id="resourceBody"></tbody>
         </table></div>
+        <div id="resourceMediaGrid" class="res-media-grid" hidden></div>
         <div id="resourceEmpty" hidden></div><div class="cms-table-footer" id="resourceFooter"></div>
       </section>
     </main>

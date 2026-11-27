@@ -31,8 +31,9 @@ class CmsContentController extends Controller
             'announcementCategories' => DB::table('announcement_categories')->orderBy('name')->get(['category_id as id', 'name']),
             'eventCategories'        => $this->eventCategories(),
             'campuses'               => DB::table('campuses')->orderBy('name')->get(['campus_id as id', 'name', 'status']),
-            'colleges'               => DB::table('colleges')->orderBy('name')->get(['college_id as id', 'name', 'code', 'status']),
-            'departments'            => DB::table('departments')->orderBy('name')->get(['department_id as id', 'college_id as collegeId', 'name']),
+            'colleges'               => DB::table('colleges')->orderBy('name')->get(['college_id as id', 'campus_id as campusId', 'name', 'code', 'status']),
+            'departments'            => DB::table('departments')->orderBy('name')->get(['department_id as id', 'college_id as collegeId', 'campus_id as campusId', 'name', 'status']),
+            'documentCategories'     => DB::table('document_categories')->orderBy('name')->get(['category_id as id', 'name', 'description']),
             'degreeLevels'           => DB::table('programs')->select('degree_level')->distinct()->orderBy('degree_level')->pluck('degree_level'),
             'userRoles'              => DB::table('users')->select('role')->distinct()->orderBy('role')->pluck('role'),
         ]);
@@ -929,32 +930,62 @@ class CmsContentController extends Controller
     {
         $filters = $request->validate([
             'q'          => ['nullable', 'string', 'max:200'],
+            'college'    => ['nullable', 'integer', 'exists:colleges,college_id'],
             'department' => ['nullable', 'integer', 'exists:departments,department_id'],
+            'status'     => ['nullable', Rule::in(['active', 'inactive'])],
         ]);
         $query = DB::table('faculty_staff as f')
             ->leftJoin('departments as d', 'd.department_id', '=', 'f.department_id')
+            ->leftJoin('colleges as c', 'c.college_id', '=', 'd.college_id')
+            ->leftJoin('campuses as cp', 'cp.campus_id', '=', 'f.campus_id')
             ->select([
                 'f.faculty_id as id',
-                DB::raw("TRIM(CONCAT(COALESCE(f.first_name, ''), ' ', COALESCE(f.middle_name, ''), ' ', COALESCE(f.last_name, ''))) as name"),
-                'f.position', 'f.department_id as departmentId',
-                'd.name as department', 'f.email', 'f.biography as summary',
+                'f.first_name as firstName', 'f.middle_name as middleName', 'f.last_name as lastName',
+                'f.position', 'f.campus_id as campusId', 'f.department_id as departmentId',
+                'd.name as department', 'd.college_id as collegeId', 'c.name as college',
+                'cp.name as campus',
+                'f.email', 'f.contact_number as contactNumber',
+                'f.educational_background as education', 'f.biography', 'f.biography as summary',
+                'f.status', 'f.photo_media_id as photoMediaId',
             ]);
 
         if (! empty($filters['q'])) {
-            $term = '%' . $this->escapeLike($filters['q']) . '%';
-            $query->where(function ($q) use ($term): void {
-                $q->whereRaw("CONCAT(COALESCE(f.first_name, ''), ' ', COALESCE(f.middle_name, ''), ' ', COALESCE(f.last_name, '')) like ?", [$term])
-                    ->orWhere('f.position', 'like', $term)
-                    ->orWhere('f.email', 'like', $term)
-                    ->orWhere('f.biography', 'like', $term)
-                    ->orWhere('d.name', 'like', $term);
-            });
+            $terms = preg_split('/\s+/', trim($filters['q']), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            foreach ($terms as $word) {
+                $term = '%' . $this->escapeLike($word) . '%';
+                $query->where(function ($q) use ($term): void {
+                    $q->where('f.first_name', 'like', $term)
+                        ->orWhere('f.middle_name', 'like', $term)
+                        ->orWhere('f.last_name', 'like', $term)
+                        ->orWhere('f.position', 'like', $term)
+                        ->orWhere('f.email', 'like', $term)
+                        ->orWhere('f.biography', 'like', $term)
+                        ->orWhere('d.name', 'like', $term)
+                        ->orWhere('c.name', 'like', $term);
+                });
+            }
+        }
+        if (! empty($filters['college'])) {
+            $query->where('d.college_id', $filters['college']);
         }
         if (! empty($filters['department'])) {
             $query->where('f.department_id', $filters['department']);
         }
+        if (! empty($filters['status'])) {
+            $query->where('f.status', $filters['status']);
+        }
 
-        return response()->json($query->orderBy('f.last_name')->orderBy('f.faculty_id')->limit(100)->get());
+        $rows = $query->orderBy('f.last_name')->orderBy('f.faculty_id')->limit(100)->get();
+
+        return response()->json($rows->map(function (object $row): array {
+            $row->name = implode(' ', array_values(array_filter([
+                trim((string) $row->firstName),
+                trim((string) $row->middleName),
+                trim((string) $row->lastName),
+            ], static fn (string $part): bool => $part !== '')));
+            $row->photoUrl = $this->mediaUrl($row->photoMediaId === null ? null : (int) $row->photoMediaId);
+            return (array) $row;
+        }));
     }
 
     public function facultyShow(int $id): JsonResponse
@@ -990,12 +1021,14 @@ class CmsContentController extends Controller
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:200']]);
         $query = DB::table('media')->select([
             'media_id as id', 'file_name as fileName', 'mime_type as mimeType',
-            'file_size as fileSize', 'alt_text as altText', 'file_path as filePath', 'created_at as createdAt',
+            'file_size as fileSize', 'title', 'alt_text as altText', 'caption', 'description',
+            'file_path as filePath', 'created_at as createdAt',
         ]);
         if (! empty($filters['q'])) {
             $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
-                $q->where('file_name', 'like', $term)->orWhere('alt_text', 'like', $term);
+                $q->where('file_name', 'like', $term)->orWhere('title', 'like', $term)
+                    ->orWhere('alt_text', 'like', $term)->orWhere('caption', 'like', $term);
             });
         }
         $rows = $query->orderByDesc('media_id')->limit(100)->get();
@@ -1003,9 +1036,12 @@ class CmsContentController extends Controller
         return response()->json($rows->map(fn (object $row): array => [
             'id'        => (int) $row->id,
             'fileName'  => $row->fileName,
+            'title'     => $row->title ?? '',
             'mimeType'  => $row->mimeType,
             'fileSize'  => $row->fileSize === null ? null : (int) $row->fileSize,
             'altText'   => $row->altText ?? '',
+            'caption'   => $row->caption ?? '',
+            'description' => $row->description ?? '',
             'createdAt' => $row->createdAt,
             'available' => $this->storedFileExists((string) $row->filePath),
             'url'       => $this->mediaUrl((int) $row->id),
@@ -1015,13 +1051,21 @@ class CmsContentController extends Controller
     public function mediaStore(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'data'    => ['required', 'string', 'max:7500000'],
-            'altText' => ['nullable', 'string', 'max:255'],
+            'data'        => ['required', 'string', 'max:7500000'],
+            'title'       => ['nullable', 'string', 'max:200'],
+            'altText'     => ['nullable', 'string', 'max:255'],
+            'caption'     => ['nullable', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:5000'],
         ]);
         $id = $this->transactionWithUploadCleanup(function (array &$createdFiles) use ($data): int {
             $id = $this->storeImage($data['data'], $createdFiles);
             abort_unless($id !== null, 422, 'Select an image file to upload.');
-            DB::table('media')->where('media_id', $id)->update(['alt_text' => trim($data['altText'] ?? '') ?: null]);
+            DB::table('media')->where('media_id', $id)->update([
+                'title' => trim($data['title'] ?? '') ?: null,
+                'alt_text' => trim($data['altText'] ?? '') ?: null,
+                'caption' => trim($data['caption'] ?? '') ?: null,
+                'description' => trim($data['description'] ?? '') ?: null,
+            ]);
 
             return $id;
         });
@@ -1032,8 +1076,21 @@ class CmsContentController extends Controller
     public function mediaUpdate(Request $request, int $id): JsonResponse
     {
         abort_unless(DB::table('media')->where('media_id', $id)->exists(), 404);
-        $data = $request->validate(['altText' => ['nullable', 'string', 'max:255']]);
-        DB::table('media')->where('media_id', $id)->update(['alt_text' => trim($data['altText'] ?? '') ?: null]);
+        $data = $request->validate([
+            'title'       => ['sometimes', 'nullable', 'string', 'max:200'],
+            'altText'     => ['sometimes', 'nullable', 'string', 'max:255'],
+            'caption'     => ['sometimes', 'nullable', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
+        ]);
+        $values = [];
+        foreach (['title' => 'title', 'altText' => 'alt_text', 'caption' => 'caption', 'description' => 'description'] as $input => $column) {
+            if (array_key_exists($input, $data)) {
+                $values[$column] = trim((string) $data[$input]) ?: null;
+            }
+        }
+        if ($values !== []) {
+            DB::table('media')->where('media_id', $id)->update($values);
+        }
 
         return response()->json($this->mediaJson($id));
     }
@@ -1070,20 +1127,95 @@ class CmsContentController extends Controller
         });
     }
 
+    public function documentCategoriesIndex(): JsonResponse
+    {
+        $rows = DB::table('document_categories as c')
+            ->leftJoin('documents as d', 'd.category_id', '=', 'c.category_id')
+            ->select([
+                'c.category_id as id',
+                'c.name',
+                'c.description',
+                DB::raw('COUNT(d.document_id) as documentCount'),
+            ])
+            ->groupBy('c.category_id', 'c.name', 'c.description')
+            ->orderBy('c.name')
+            ->get();
+
+        return response()->json($rows);
+    }
+
+    public function documentCategoryStore(Request $request): JsonResponse
+    {
+        $this->trimUniqueFields($request, ['name']);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:80', Rule::unique('document_categories', 'name')],
+            'description' => ['nullable', 'string', 'max:255'],
+        ]);
+        $id = DB::table('document_categories')->insertGetId([
+            'name' => trim($data['name']),
+            'description' => trim($data['description'] ?? '') ?: null,
+        ], 'category_id');
+
+        return response()->json($this->documentCategoryRow((int) $id), 201);
+    }
+
+    public function documentCategoryUpdate(Request $request, int $id): JsonResponse
+    {
+        abort_unless(DB::table('document_categories')->where('category_id', $id)->exists(), 404);
+        $this->trimUniqueFields($request, ['name']);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:80', Rule::unique('document_categories', 'name')->ignore($id, 'category_id')],
+            'description' => ['nullable', 'string', 'max:255'],
+        ]);
+        DB::table('document_categories')->where('category_id', $id)->update([
+            'name' => trim($data['name']),
+            'description' => trim($data['description'] ?? '') ?: null,
+        ]);
+
+        return response()->json($this->documentCategoryRow($id));
+    }
+
+    public function documentCategoryDestroy(int $id): JsonResponse
+    {
+        abort_unless(DB::table('document_categories')->where('category_id', $id)->exists(), 404);
+        $documentCount = DB::table('documents')->where('category_id', $id)->count();
+        if ($documentCount > 0) {
+            return response()->json([
+                'message' => 'Move or delete the documents in this category before deleting it.',
+                'documentCount' => $documentCount,
+            ], 409);
+        }
+        DB::table('document_categories')->where('category_id', $id)->delete();
+
+        return response()->json(['deleted' => true]);
+    }
+
     public function documentsIndex(Request $request): JsonResponse
     {
-        $filters = $request->validate(['q' => ['nullable', 'string', 'max:200']]);
-        $query = DB::table('documents')->select([
-            'document_id as id', 'title', 'file_name as fileName', 'mime_type as mimeType',
-            'file_size as fileSize', 'file_path as filePath', 'created_at as createdAt',
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:200'],
+            'category' => ['nullable', 'integer', 'exists:document_categories,category_id'],
         ]);
+        $query = DB::table('documents as d')
+            ->leftJoin('document_categories as c', 'c.category_id', '=', 'd.category_id')
+            ->leftJoin('users as u', 'u.user_id', '=', 'd.created_by')
+            ->select([
+                'd.document_id as id', 'd.title', 'd.file_name as fileName', 'd.mime_type as mimeType',
+                'd.file_size as fileSize', 'd.file_path as filePath', 'd.created_at as createdAt',
+                'd.category_id as categoryId', 'c.name as categoryName', 'd.description',
+                'd.access_level as accessLevel', 'u.full_name as uploadedBy',
+            ]);
         if (! empty($filters['q'])) {
             $term = '%' . $this->escapeLike($filters['q']) . '%';
             $query->where(function ($q) use ($term): void {
-                $q->where('title', 'like', $term)->orWhere('file_name', 'like', $term);
+                $q->where('d.title', 'like', $term)->orWhere('d.file_name', 'like', $term)
+                    ->orWhere('d.description', 'like', $term);
             });
         }
-        $rows = $query->orderByDesc('document_id')->limit(100)->get();
+        if (! empty($filters['category'])) {
+            $query->where('d.category_id', $filters['category']);
+        }
+        $rows = $query->orderByDesc('d.document_id')->limit(100)->get();
 
         return response()->json($rows->map(fn (object $row): array => [
             'id'        => (int) $row->id,
@@ -1091,6 +1223,11 @@ class CmsContentController extends Controller
             'fileName'  => $row->fileName,
             'mimeType'  => $row->mimeType,
             'fileSize'  => $row->fileSize === null ? null : (int) $row->fileSize,
+            'categoryId' => $row->categoryId === null ? null : (int) $row->categoryId,
+            'categoryName' => $row->categoryName ?? 'Uncategorized',
+            'description' => $row->description ?? '',
+            'accessLevel' => $row->accessLevel,
+            'uploadedBy' => $row->uploadedBy ?? '',
             'createdAt' => $row->createdAt,
             'available' => $this->storedFileExists((string) $row->filePath),
             'url'       => route('cms.document', ['id' => (int) $row->id]),
@@ -1100,18 +1237,21 @@ class CmsContentController extends Controller
     public function documentStore(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'title'    => ['nullable', 'string', 'max:255'],
-            'fileName' => ['required', 'string', 'max:255'],
-            'data'     => ['required', 'string', 'max:600000'],
+            'title'       => ['nullable', 'string', 'max:255'],
+            'categoryId'  => ['nullable', 'integer', 'exists:document_categories,category_id'],
+            'description' => ['nullable', 'string', 'max:5000'],
+            'fileName'    => ['required', 'string', 'max:255'],
+            'data'        => ['required', 'string', 'max:600000'],
         ]);
-        $id = $this->transactionWithUploadCleanup(function (array &$createdFiles) use ($data): int {
-            $id = $this->storeDocument(['name' => $data['fileName'], 'data' => $data['data']], $createdFiles);
-            if (! empty($data['title'])) {
-                DB::table('documents')->where('document_id', $id)->update(['title' => trim($data['title'])]);
-            }
-
-            return $id;
-        });
+        $id = $this->transactionWithUploadCleanup(fn (array &$createdFiles): int => $this->storeDocument(
+            ['name' => $data['fileName'], 'data' => $data['data']],
+            $createdFiles,
+            [
+                'title' => trim($data['title'] ?? ''),
+                'categoryId' => $data['categoryId'] ?? null,
+                'description' => trim($data['description'] ?? ''),
+            ]
+        ));
 
         return response()->json($this->documentJson($id), 201);
     }
@@ -1119,8 +1259,24 @@ class CmsContentController extends Controller
     public function documentUpdate(Request $request, int $id): JsonResponse
     {
         abort_unless(DB::table('documents')->where('document_id', $id)->exists(), 404);
-        $data = $request->validate(['title' => ['nullable', 'string', 'max:255']]);
-        DB::table('documents')->where('document_id', $id)->update(['title' => trim($data['title'] ?? '') ?: null]);
+        $data = $request->validate([
+            'title'       => ['sometimes', 'nullable', 'string', 'max:255'],
+            'categoryId'  => ['sometimes', 'nullable', 'integer', 'exists:document_categories,category_id'],
+            'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
+        ]);
+        $values = [];
+        if (array_key_exists('title', $data)) {
+            $values['title'] = trim((string) $data['title']) ?: null;
+        }
+        if (array_key_exists('categoryId', $data)) {
+            $values['category_id'] = $data['categoryId'];
+        }
+        if (array_key_exists('description', $data)) {
+            $values['description'] = trim((string) $data['description']) ?: null;
+        }
+        if ($values !== []) {
+            DB::table('documents')->where('document_id', $id)->update($values);
+        }
 
         return response()->json($this->documentJson($id));
     }
@@ -1151,12 +1307,43 @@ class CmsContentController extends Controller
         return $this->storedFileResponse((string) $media->file_path, $media->mime_type, $media->file_name, ! $inline);
     }
 
-    public function documentShow(int $id): Response
+    public function documentShow(Request $request, int $id): Response
     {
         $document = DB::table('documents')->where('document_id', $id)->first();
         abort_unless($document !== null, 404);
 
-        return $this->storedFileResponse((string) $document->file_path, $document->mime_type, $document->file_name);
+        return $this->storedFileResponse(
+            (string) $document->file_path,
+            $document->mime_type,
+            $document->file_name,
+            $request->boolean('download', true)
+        );
+    }
+
+    public function publicMediaShow(int $id): Response
+    {
+        $media = DB::table('media')->where('media_id', $id)->first();
+        abort_unless($media !== null && in_array((string) $media->mime_type, [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        ], true), 404);
+
+        return $this->storedFileResponse((string) $media->file_path, $media->mime_type, $media->file_name, false);
+    }
+
+    public function publicDocumentShow(Request $request, int $id): Response
+    {
+        $document = DB::table('documents')
+            ->where('document_id', $id)
+            ->where('access_level', 'public')
+            ->first();
+        abort_unless($document !== null, 404);
+
+        return $this->storedFileResponse(
+            (string) $document->file_path,
+            $document->mime_type,
+            $document->file_name,
+            $request->boolean('download', true)
+        );
     }
 
     private function saveNews(Request $request, ?int $id = null): JsonResponse
@@ -1428,43 +1615,84 @@ class CmsContentController extends Controller
 
     private function saveFaculty(Request $request, ?int $id = null): JsonResponse
     {
-        $this->trimUniqueFields($request, ['email'], ['email']);
-        $request->merge([
-            'name' => trim((string) $request->input('name')),
-            'position' => trim((string) $request->input('position')),
-            'summary' => trim((string) $request->input('summary')),
-        ]);
-        $data = $request->validate([
-            'name'         => ['required', 'string', 'max:150'],
-            'position'     => ['nullable', 'string', 'max:150'],
-            'departmentId' => ['nullable', 'integer', 'exists:departments,department_id'],
-            'email'        => ['nullable', 'email', 'max:255', Rule::unique('faculty_staff', 'email')->ignore($id, 'faculty_id')],
-            'summary'      => ['nullable', 'string', 'max:5000'],
-        ]);
-        $nameParts = preg_split('/\s+/', trim($data['name']), 3) ?: [trim($data['name'])];
-        $firstName = $nameParts[0] ?? '';
-        $middleName = count($nameParts) === 3 ? ($nameParts[1] ?? null) : null;
-        $lastName = count($nameParts) >= 2 ? end($nameParts) : '';
-        $values = [
-            'first_name'    => $firstName,
-            'middle_name'   => $middleName,
-            'last_name'     => $lastName,
-            'position'      => isset($data['position']) ? trim($data['position']) : null,
-            'department_id' => $data['departmentId'] ?? null,
-            'email'         => isset($data['email']) ? trim($data['email']) : null,
-            'biography'     => isset($data['summary']) ? trim($data['summary']) : null,
-            'updated_at'    => now(),
-        ];
-        if ($id === null) {
-            $values['created_at'] = now();
-            $values['campus_id'] = DB::table('departments')->where('department_id', $data['departmentId'] ?? 0)->value('campus_id')
-                ?? DB::table('campuses')->orderBy('campus_id')->value('campus_id');
-            abort_unless($values['campus_id'], 422, 'A campus is required for faculty records.');
-            $facultyId = DB::table('faculty_staff')->insertGetId($values, 'faculty_id');
-        } else {
-            DB::table('faculty_staff')->where('faculty_id', $id)->update($values);
-            $facultyId = $id;
+        $existing = $id === null ? null : DB::table('faculty_staff')->where('faculty_id', $id)->first();
+        if ($request->filled('name') && ! $request->has('firstName')) {
+            $parts = preg_split('/\s+/', trim((string) $request->input('name')), 3) ?: [];
+            $request->merge([
+                'firstName' => $parts[0] ?? '',
+                'middleName' => count($parts) === 3 ? ($parts[1] ?? null) : null,
+                'lastName' => count($parts) >= 2 ? (string) end($parts) : '',
+            ]);
         }
+        if ($request->has('summary') && ! $request->has('biography')) {
+            $request->merge(['biography' => $request->input('summary')]);
+        }
+        if (! $request->has('status')) {
+            $request->merge(['status' => $existing->status ?? 'active']);
+        }
+        $this->trimUniqueFields($request, ['email'], ['email']);
+        $data = $request->validate([
+            'firstName'    => ['required', 'string', 'max:80'],
+            'middleName'   => ['nullable', 'string', 'max:80'],
+            'lastName'     => ['required', 'string', 'max:80'],
+            'position'     => ['required', 'string', 'max:150'],
+            'campusId'     => ['nullable', 'integer', 'exists:campuses,campus_id'],
+            'departmentId' => ['nullable', 'integer', 'exists:departments,department_id'],
+            'email'        => ['nullable', 'email', 'max:150', Rule::unique('faculty_staff', 'email')->ignore($id, 'faculty_id')],
+            'contactNumber' => ['nullable', 'string', 'max:30'],
+            'education'    => ['nullable', 'string', 'max:5000'],
+            'biography'    => ['nullable', 'string', 'max:10000'],
+            'status'       => ['required', Rule::in(['active', 'inactive'])],
+            'photoMediaId' => ['sometimes', 'nullable', 'integer', 'exists:media,media_id', 'prohibited_with:photoData'],
+            'photoData'    => ['nullable', 'string', 'max:7500000'],
+        ]);
+        foreach (['firstName', 'middleName', 'lastName', 'position', 'email', 'contactNumber', 'education', 'biography'] as $field) {
+            if (isset($data[$field])) {
+                $data[$field] = trim($data[$field]);
+            }
+        }
+        $departmentCampusId = ! empty($data['departmentId'])
+            ? DB::table('departments')->where('department_id', $data['departmentId'])->value('campus_id')
+            : null;
+        if (! empty($data['campusId']) && $departmentCampusId && (int) $data['campusId'] !== (int) $departmentCampusId) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'campusId' => ['The selected department belongs to a different campus.'],
+            ]);
+        }
+        $campusId = $data['campusId'] ?? $departmentCampusId ?? $existing->campus_id ?? DB::table('campuses')->orderBy('campus_id')->value('campus_id');
+        abort_unless($campusId, 422, 'A campus is required for faculty records.');
+
+        $facultyId = $this->transactionWithUploadCleanup(function (array &$createdFiles) use ($data, $id, $existing, $campusId): int {
+            $photoMediaId = array_key_exists('photoMediaId', $data)
+                ? $data['photoMediaId']
+                : ($existing->photo_media_id ?? null);
+            if (! empty($data['photoData'])) {
+                $photoMediaId = $this->storeImage($data['photoData'], $createdFiles);
+                abort_unless($photoMediaId !== null, 422, 'Select a valid profile image.');
+            }
+            $values = [
+                'first_name' => $data['firstName'],
+                'middle_name' => $data['middleName'] ?? null,
+                'last_name' => $data['lastName'],
+                'position' => $data['position'],
+                'campus_id' => $campusId,
+                'department_id' => $data['departmentId'] ?? null,
+                'photo_media_id' => $photoMediaId,
+                'email' => $data['email'] ?? null,
+                'contact_number' => $data['contactNumber'] ?? null,
+                'educational_background' => $data['education'] ?? null,
+                'biography' => $data['biography'] ?? null,
+                'status' => $data['status'],
+                'updated_at' => now(),
+            ];
+            abort_unless($values['campus_id'], 422, 'A campus is required for faculty records.');
+            if ($id === null) {
+                $values['created_at'] = now();
+                return (int) DB::table('faculty_staff')->insertGetId($values, 'faculty_id');
+            }
+            DB::table('faculty_staff')->where('faculty_id', $id)->update($values);
+            return $id;
+        });
 
         return response()->json($this->findFaculty($facultyId), $id === null ? 201 : 200);
     }
@@ -1713,9 +1941,12 @@ class CmsContentController extends Controller
         return [
             'id' => (int) $row->media_id,
             'fileName' => $row->file_name,
+            'title' => $row->title ?? '',
             'mimeType' => $row->mime_type,
             'fileSize' => $row->file_size === null ? null : (int) $row->file_size,
             'altText' => $row->alt_text ?? '',
+            'caption' => $row->caption ?? '',
+            'description' => $row->description ?? '',
             'createdAt' => $row->created_at,
             'available' => $this->storedFileExists((string) $row->file_path),
             'url' => $this->mediaUrl((int) $row->media_id),
@@ -1733,6 +1964,10 @@ class CmsContentController extends Controller
             'fileName' => $row->file_name,
             'mimeType' => $row->mime_type,
             'fileSize' => $row->file_size === null ? null : (int) $row->file_size,
+            'categoryId' => $row->category_id === null ? null : (int) $row->category_id,
+            'categoryName' => DB::table('document_categories')->where('category_id', $row->category_id)->value('name') ?? 'Uncategorized',
+            'description' => $row->description ?? '',
+            'accessLevel' => $row->access_level ?? 'public',
             'createdAt' => $row->created_at,
             'available' => $this->storedFileExists((string) $row->file_path),
             'url' => route('cms.document', ['id' => (int) $row->document_id]),
@@ -1761,17 +1996,46 @@ class CmsContentController extends Controller
     {
         $row = DB::table('faculty_staff as f')
             ->leftJoin('departments as d', 'd.department_id', '=', 'f.department_id')
+            ->leftJoin('colleges as c', 'c.college_id', '=', 'd.college_id')
+            ->leftJoin('campuses as cp', 'cp.campus_id', '=', 'f.campus_id')
             ->select([
                 'f.faculty_id as id',
-                DB::raw("TRIM(CONCAT(COALESCE(f.first_name, ''), ' ', COALESCE(f.middle_name, ''), ' ', COALESCE(f.last_name, ''))) as name"),
-                'f.position', 'f.department_id as departmentId',
-                'd.name as department', 'f.email', 'f.biography as summary',
+                'f.first_name as firstName', 'f.middle_name as middleName', 'f.last_name as lastName',
+                'f.position', 'f.campus_id as campusId', 'f.department_id as departmentId',
+                'd.name as department', 'd.college_id as collegeId', 'c.name as college',
+                'cp.name as campus',
+                'f.email', 'f.contact_number as contactNumber', 'f.educational_background as education',
+                'f.biography', 'f.biography as summary', 'f.status', 'f.photo_media_id as photoMediaId',
             ])
             ->where('f.faculty_id', $id)
             ->first();
         abort_unless($row !== null, 404);
+        $row->name = implode(' ', array_values(array_filter([
+            trim((string) $row->firstName),
+            trim((string) $row->middleName),
+            trim((string) $row->lastName),
+        ], static fn (string $part): bool => $part !== '')));
+        $row->photoUrl = $this->mediaUrl($row->photoMediaId === null ? null : (int) $row->photoMediaId);
 
         return $row;
+    }
+
+    private function documentCategoryRow(int $id): array
+    {
+        $row = DB::table('document_categories as c')
+            ->leftJoin('documents as d', 'd.category_id', '=', 'c.category_id')
+            ->select([
+                'c.category_id as id',
+                'c.name',
+                'c.description',
+                DB::raw('COUNT(d.document_id) as documentCount'),
+            ])
+            ->where('c.category_id', $id)
+            ->groupBy('c.category_id', 'c.name', 'c.description')
+            ->first();
+        abort_unless($row !== null, 404);
+
+        return (array) $row;
     }
 
     private function findUser(int $id): object
@@ -2027,7 +2291,7 @@ class CmsContentController extends Controller
         return $id;
     }
 
-    private function storeDocument(array $attachment, ?array &$createdFiles = null): int
+    private function storeDocument(array $attachment, ?array &$createdFiles = null, array $metadata = []): int
     {
         if (! preg_match('#^data:([A-Za-z0-9.+/-]+);base64,([A-Za-z0-9+/=]+)$#', (string) ($attachment['data'] ?? ''), $matches)) {
             abort(422, 'Please reselect the attachment before saving.');
@@ -2047,13 +2311,14 @@ class CmsContentController extends Controller
         }
 
         $documentId = DB::table('documents')->insertGetId([
-            'title'     => pathinfo($name, PATHINFO_FILENAME),
-            'category_id' => DB::table('document_categories')->orderBy('category_id')->value('category_id'),
+            'title'     => ($metadata['title'] ?? '') ?: pathinfo($name, PATHINFO_FILENAME),
+            'category_id' => $metadata['categoryId'] ?? null,
             'created_by' => request()->user()?->user_id,
             'file_name' => $name,
             'file_path' => 'private/' . $path,
             'mime_type' => $mime,
             'file_size' => strlen($bytes),
+            'description' => ($metadata['description'] ?? '') ?: null,
         ], 'document_id');
         if ($documentId) {
             DB::table('document_versions')->insert([

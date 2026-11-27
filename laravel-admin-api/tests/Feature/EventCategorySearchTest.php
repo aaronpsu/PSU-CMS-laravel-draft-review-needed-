@@ -14,7 +14,7 @@ class EventCategorySearchTest extends TestCase
     {
         parent::setUp();
 
-        foreach (['event_categories', 'news_categories', 'announcement_categories', 'campuses', 'colleges', 'departments', 'programs', 'users'] as $table) {
+        foreach (['event_categories', 'news_categories', 'announcement_categories', 'document_categories', 'campuses', 'colleges', 'departments', 'programs', 'users'] as $table) {
             Schema::dropIfExists($table);
         }
         Schema::create('event_categories', function (Blueprint $table): void {
@@ -29,6 +29,11 @@ class EventCategorySearchTest extends TestCase
         Schema::create('announcement_categories', function (Blueprint $table): void {
             $table->increments('category_id');
             $table->string('name');
+        });
+        Schema::create('document_categories', function (Blueprint $table): void {
+            $table->increments('category_id');
+            $table->string('name', 80);
+            $table->string('description', 255)->nullable();
         });
         Schema::create('campuses', function (Blueprint $table): void {
             $table->increments('campus_id');
@@ -67,7 +72,7 @@ class EventCategorySearchTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (['event_categories', 'news_categories', 'announcement_categories', 'campuses', 'colleges', 'departments', 'programs', 'users'] as $table) {
+        foreach (['event_categories', 'news_categories', 'announcement_categories', 'document_categories', 'campuses', 'colleges', 'departments', 'programs', 'users'] as $table) {
             Schema::dropIfExists($table);
         }
 

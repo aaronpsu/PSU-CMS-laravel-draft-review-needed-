@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Staff Login Preview | Pangasinan State University</title>
+  <meta name="description" content="Staff login page preview for Pangasinan State University.">
+  <link rel="icon" href="../assets/images/psu-logo.png" type="image/png">
+  <link rel="stylesheet" href="../css/variables.css">
+  <link rel="stylesheet" href="../css/global.css">
+  <link rel="stylesheet" href="../css/header.css">
+  <link rel="stylesheet" href="../css/footer.css">
+  <link rel="stylesheet" href="../css/resources.css">
+  <script src="../js/header.js" defer></script>
+  <script src="../js/includes.js" defer></script>
+</head>
+<body data-root="../../" data-nav="resources">
+  <div data-include="header"></div>
+  <main id="main" class="resource-access-main">
+    <section class="resource-login-card" aria-labelledby="login-title">
+      <h1 id="login-title">Staff Login</h1>
+      <p>Authentication is not connected. This screen is a UI preview only.</p>
+      <form class="resource-login-form">
+        <div>
+          <label for="staff-email">Email</label>
+          <input id="staff-email" type="email" autocomplete="username" placeholder="you@psu.edu.ph" disabled>
+        </div>
+        <div>
+          <label for="staff-password">Password</label>
+          <input id="staff-password" type="password" autocomplete="current-password" placeholder="Password" disabled>
+        </div>
+        <button class="btn btn--primary" type="button" disabled>Log in</button>
+      </form>
+      <a class="resource-login-back" href="documents.html">Back to Documents</a>
+    </section>
+  </main>
+  <div data-include="footer"></div>
+</body>
+</html>

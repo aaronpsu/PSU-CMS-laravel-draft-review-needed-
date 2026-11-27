@@ -406,7 +406,7 @@ DROP TABLE IF EXISTS `documents`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `documents` (
   `document_id` int(11) NOT NULL AUTO_INCREMENT,
-  `category_id` int(11) NOT NULL,
+  `category_id` int(11) DEFAULT NULL,
   `campus_id` int(11) DEFAULT NULL,
   `created_by` int(11) NOT NULL,
   `title` varchar(255) NOT NULL,

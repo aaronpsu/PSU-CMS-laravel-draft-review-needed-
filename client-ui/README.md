@@ -21,6 +21,10 @@ From the repo root: `php -S localhost:8000`, then open
 | `js/includes.js` | Loads header/footer into `<div data-include="header|footer">` |
 | `js/header.js` | Active link, dropdowns, mobile menu, search panel |
 | `js/contact.js`, `utility.js` | Page logic |
+| `faculty/` and `css/people.css` | Faculty directory and profile UI previews; no public data connection |
+| `resources/` and `css/resources.css` | Document library, staff access, and login UI previews; no public data or authentication connection |
+
+The Faculty and Staff and Documents pages in the shared site navigation still point to the existing PHP routes. The new pages are standalone UI previews and do not replace those routes or use the prototype's localStorage or demo login.
 
 ## Using the shared header on any page (teammates)
 ```html

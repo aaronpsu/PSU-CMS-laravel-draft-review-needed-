@@ -1,48 +1,76 @@
 (function () {
-  var ui = CMS.ui, el = ui.el;
-  var faculty = [], departments = [];
-  var state = { q: '', department: '', page: 1 };
-  var pageSize = 10;
-  var loadRequest = 0;
+  var ui = CMS.ui, el = ui.el, api = CMS.api;
+  var PAGE_SIZE = 8;
+  var state = { q: '', college: '', department: '', status: '', rows: [], page: 1, request: 0 };
+  var options = { colleges: [], departments: [] };
+
+  function initials(person) {
+    return ((person.firstName || '').trim().charAt(0) + (person.lastName || '').trim().charAt(0)).toUpperCase() || '?';
+  }
 
   function load() {
-    var requestId = ++loadRequest;
+    var request = ++state.request;
     return Promise.all([
-      CMS.api.query('/faculty', { q: state.q, department: state.department }),
-      CMS.api.get('/options')
+      api.query('/faculty', {
+        q: state.q,
+        college: state.college,
+        department: state.department,
+        status: state.status
+      }),
+      api.get('/options')
     ]).then(function (results) {
-      if (requestId !== loadRequest) return;
-      faculty = results[0];
-      departments = results[1].departments;
-      renderDepartmentOptions();
+      if (request !== state.request) return;
+      state.rows = results[0];
+      options.colleges = results[1].colleges || [];
+      options.departments = results[1].departments || [];
+      renderFilters();
       render();
     }).catch(function (error) {
-      if (requestId !== loadRequest) return;
-      throw error;
+      if (request !== state.request) return;
+      renderError(error);
     });
   }
 
-  function renderDepartmentOptions() {
-    var filter = document.getElementById('facultyDepartmentFilter');
-    ui.setOptions(filter, [{ value: '', label: 'All Departments' }].concat(departments.map(function (d) {
-      return { value: String(d.id), label: d.name };
+  function renderFilters() {
+    ui.setOptions(document.getElementById('facultyCollegeFilter'), [
+      { value: '', label: 'All Colleges' }
+    ].concat(options.colleges.map(function (college) {
+      return { value: String(college.id), label: college.name };
+    })), state.college);
+
+    var departments = options.departments.filter(function (department) {
+      return !state.college || String(department.collegeId) === state.college;
+    });
+    ui.setOptions(document.getElementById('facultyDepartmentFilter'), [
+      { value: '', label: 'All Departments' }
+    ].concat(departments.map(function (department) {
+      return { value: String(department.id), label: department.name };
     })), state.department);
+  }
+
+  function personPhoto(person) {
+    if (person.photoUrl) {
+      return el('img', { class: 'cms-thumb res-person-thumb', src: person.photoUrl, alt: '' });
+    }
+    return el('span', { class: 'cms-thumb res-person-thumb res-person-initials', text: initials(person), 'aria-hidden': 'true' });
   }
 
   function rowFor(person) {
     var row = el('tr');
-    row.appendChild(el('td', { class: 'cms-cell-title', text: person.name }));
+    row.appendChild(el('td', {}, [personPhoto(person)]));
+    row.appendChild(el('td', { class: 'cms-cell-title', text: person.name || 'Unnamed personnel' }));
     row.appendChild(el('td', { text: person.position || '—' }));
+    row.appendChild(el('td', { text: person.college || '—' }));
     row.appendChild(el('td', { text: person.department || 'Unassigned' }));
     row.appendChild(el('td', { text: person.email || '—' }));
-
-    var view = el('button', { type: 'button', class: 'cms-action', text: 'View', 'aria-label': 'View ' + person.name });
-    var edit = el('button', { type: 'button', class: 'cms-action', text: 'Edit', 'aria-label': 'Edit ' + person.name });
-    var remove = el('button', { type: 'button', class: 'cms-action cms-action-danger', text: 'Delete', 'aria-label': 'Delete ' + person.name });
-    view.addEventListener('click', function () { showDetails(person); });
-    edit.addEventListener('click', function () { openForm(person); });
-    remove.addEventListener('click', function () { deletePerson(person); });
-    row.appendChild(el('td', {}, [el('div', { class: 'cms-actions' }, [view, edit, remove])]));
+    row.appendChild(el('td', {}, [
+      ui.badge(person.status === 'active' ? 'published' : 'draft', person.status === 'active' ? 'Active' : 'Inactive')
+    ]));
+    row.appendChild(el('td', {}, [el('div', { class: 'cms-actions' }, [
+      el('button', { type: 'button', class: 'cms-action', text: 'View', 'data-person-view': String(person.id) }),
+      el('a', { class: 'cms-action', href: 'personnel-form.html?id=' + encodeURIComponent(person.id), text: 'Edit' }),
+      el('button', { type: 'button', class: 'cms-action cms-action-danger', text: 'Delete', 'data-person-delete': String(person.id) })
+    ])]));
     return row;
   }
 
@@ -51,150 +79,132 @@
     var table = document.getElementById('facultyTableWrap');
     var empty = document.getElementById('facultyEmpty');
     var footer = document.getElementById('facultyFooter');
-    var pages = Math.max(1, Math.ceil(faculty.length / pageSize));
+    var pages = Math.max(1, Math.ceil(state.rows.length / PAGE_SIZE));
     state.page = Math.min(state.page, pages);
     ui.clear(body);
     ui.clear(footer);
 
-    if (!faculty.length) {
+    if (!state.rows.length) {
       table.hidden = true;
       empty.hidden = false;
       ui.renderEmpty(empty, {
-        title: state.q || state.department ? 'No matching personnel found' : 'No personnel records yet',
-        text: state.q || state.department ? 'Try changing your search or department filter.' : 'Add a faculty or staff record to get started.'
+        title: state.q || state.college || state.department || state.status ? 'No matching personnel found' : 'No personnel records yet',
+        text: state.q || state.college || state.department || state.status
+          ? 'Try changing your search or filters.'
+          : 'Add a faculty or staff record to get started.'
       });
       return;
     }
 
     table.hidden = false;
     empty.hidden = true;
-    faculty.slice((state.page - 1) * pageSize, state.page * pageSize).forEach(function (person) {
+    state.rows.slice((state.page - 1) * PAGE_SIZE, state.page * PAGE_SIZE).forEach(function (person) {
       body.appendChild(rowFor(person));
     });
     ui.renderFooter(footer, {
       page: state.page,
-      pageSize: pageSize,
-      total: faculty.length,
+      pageSize: PAGE_SIZE,
+      total: state.rows.length,
       onPage: function (page) { state.page = page; render(); }
     });
   }
 
+  function renderError(error) {
+    var table = document.getElementById('facultyTableWrap');
+    var empty = document.getElementById('facultyEmpty');
+    var footer = document.getElementById('facultyFooter');
+    table.hidden = true;
+    footer.hidden = true;
+    empty.hidden = false;
+    ui.renderEmpty(empty, {
+      title: 'Unable to load personnel',
+      text: error.message,
+      actionLabel: 'Try again',
+      actionHref: '#'
+    });
+    var retry = empty.querySelector('a');
+    if (retry) retry.addEventListener('click', function (event) {
+      event.preventDefault();
+      load();
+    });
+    ui.toast(error.message, 'error');
+  }
+
   function showDetails(person) {
     ui.showDetails({
-      title: 'Faculty & staff record',
+      title: person.name || 'Personnel record',
+      cover: person.photoUrl || null,
       rows: [
-        ['Name', person.name],
         ['Position', person.position],
-        ['Department', person.department || 'Unassigned'],
+        ['College', person.college],
+        ['Department', person.department],
+        ['Campus', person.campus],
         ['Email', person.email],
-        ['Profile', person.summary]
+        ['Contact Number', person.contactNumber],
+        ['Educational Background', person.education],
+        ['Biography', person.biography],
+        ['Status', person.status]
       ]
-    });
-  }
-
-  function field(label, input, hint) {
-    return el('div', { class: 'cms-field' }, [
-      el('label', { class: 'cms-label', for: input.id, text: label }),
-      input,
-      el('p', { class: 'cms-field-error' }),
-      hint ? el('p', { class: 'cms-field-hint', text: hint }) : null
-    ]);
-  }
-
-  function openForm(person) {
-    var editing = Boolean(person);
-    var name = el('input', { class: 'cms-input', id: 'facultyName', type: 'text', maxlength: '150', required: true, value: person ? person.name : '' });
-    var position = el('input', { class: 'cms-input', id: 'facultyPosition', type: 'text', maxlength: '150', value: person ? person.position : '' });
-    var department = el('select', { class: 'cms-input', id: 'facultyDepartment' });
-    department.appendChild(el('option', { value: '', text: 'Unassigned' }));
-    departments.forEach(function (item) {
-      department.appendChild(el('option', { value: String(item.id), text: item.name }));
-    });
-    department.value = person && person.departmentId ? String(person.departmentId) : '';
-    var email = el('input', { class: 'cms-input', id: 'facultyEmail', type: 'email', maxlength: '255', value: person ? person.email : '' });
-    var summary = el('textarea', { class: 'cms-textarea', id: 'facultySummary', rows: '4', maxlength: '5000' });
-    summary.value = person ? person.summary || '' : '';
-
-    var body = [
-      field('Name', name),
-      field('Position', position),
-      field('Department', department),
-      field('Email', email),
-      field('Profile summary', summary)
-    ];
-    var cancel = el('button', { type: 'button', class: 'cms-btn cms-btn-outline', 'data-bs-dismiss': 'modal', text: 'Cancel' });
-    var save = el('button', { type: 'button', class: 'cms-btn cms-btn-primary', text: editing ? 'Save Changes' : 'Add Personnel' });
-    var modalEl = ui.modalShell(editing ? 'Edit Personnel' : 'Add Personnel', body, [cancel, save]);
-    var modal = ui.openModal(modalEl);
-    modalEl.addEventListener('shown.bs.modal', function () { name.focus(); });
-
-    save.addEventListener('click', function () {
-      ui.clearErrors(modalEl);
-      if (!name.value.trim()) {
-        ui.setError(name, 'Please enter a name.');
-        name.focus();
-        return;
-      }
-      if (email.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value.trim())) {
-        ui.setError(email, 'Enter a valid email address.');
-        email.focus();
-        return;
-      }
-      var payload = {
-        name: name.value.trim(),
-        position: position.value.trim() || null,
-        departmentId: department.value || null,
-        email: email.value.trim() || null,
-        summary: summary.value.trim() || null
-      };
-      var request = editing
-        ? CMS.api.put('/faculty/' + encodeURIComponent(person.id), payload)
-        : CMS.api.post('/faculty', payload);
-      save.disabled = true;
-      request.then(function () {
-        state.page = 1;
-        return load();
-      }).then(function () {
-        modal.hide();
-        ui.toast(editing ? 'Personnel record updated.' : 'Personnel record added.', 'success');
-      }).catch(function (error) {
-        ui.toast(error.message, 'error');
-      }).then(function () {
-        save.disabled = false;
-      });
     });
   }
 
   function deletePerson(person) {
     ui.confirmDialog({
       title: 'Delete personnel record',
-      message: 'Delete the record for “' + person.name + '”? This cannot be undone.',
+      message: 'Delete "' + person.name + '"? This removes the profile from the public directory.',
       confirmLabel: 'Delete'
     }).then(function (confirmed) {
       if (!confirmed) return;
-      return CMS.api.remove('/faculty/' + encodeURIComponent(person.id)).then(function () {
-        return load();
-      }).then(function () {
+      return api.remove('/faculty/' + encodeURIComponent(person.id)).then(function () {
         ui.toast('Personnel record deleted.', 'success');
-      }).catch(function (error) {
-        ui.toast(error.message, 'error');
-      });
+        return load();
+      }).catch(function (error) { ui.toast(error.message, 'error'); });
     });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    if (document.body.getAttribute('data-page') !== 'faculty') return;
-    document.getElementById('facultyAdd').addEventListener('click', function () { openForm(null); });
-    document.getElementById('facultySearch').addEventListener('input', ui.debounce(function () {
-      state.q = this.value.trim();
+    if (document.body.getAttribute('data-page') !== 'personnel') return;
+
+    var search = document.getElementById('facultySearch');
+    var collegeFilter = document.getElementById('facultyCollegeFilter');
+    var departmentFilter = document.getElementById('facultyDepartmentFilter');
+    var statusFilter = document.getElementById('facultyStatusFilter');
+    var body = document.getElementById('facultyTableBody');
+
+    search.addEventListener('input', ui.debounce(function () {
+      state.q = search.value.trim();
       state.page = 1;
-      load().catch(function (error) { ui.toast(error.message, 'error'); });
+      load();
     }, 180));
-    document.getElementById('facultyDepartmentFilter').addEventListener('change', function () {
-      state.department = this.value;
+    collegeFilter.addEventListener('change', function () {
+      state.college = collegeFilter.value;
+      state.department = '';
       state.page = 1;
-      load().catch(function (error) { ui.toast(error.message, 'error'); });
+      renderFilters();
+      load();
     });
-    load().catch(function (error) { ui.toast(error.message, 'error'); });
+    departmentFilter.addEventListener('change', function () {
+      state.department = departmentFilter.value;
+      state.page = 1;
+      load();
+    });
+    statusFilter.addEventListener('change', function () {
+      state.status = statusFilter.value;
+      state.page = 1;
+      load();
+    });
+    body.addEventListener('click', function (event) {
+      var view = event.target.closest('[data-person-view]');
+      var remove = event.target.closest('[data-person-delete]');
+      var person;
+      if (view) {
+        person = state.rows.filter(function (row) { return String(row.id) === view.getAttribute('data-person-view'); })[0];
+        if (person) showDetails(person);
+      } else if (remove) {
+        person = state.rows.filter(function (row) { return String(row.id) === remove.getAttribute('data-person-delete'); })[0];
+        if (person) deletePerson(person);
+      }
+    });
+    load();
   });
 })();

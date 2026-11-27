@@ -377,17 +377,30 @@ function site_header(string $title = ''): void
             $activeNav = 'home';
         }
     }
-    $bodyClass = basename($_SERVER['PHP_SELF'] ?? '') === 'admin.php' && empty($_SESSION['admin_id']) ? ' class="portal-login-page"' : '';
+    $headerLayout = in_array($settings['header_layout'] ?? '', ['logo-left', 'logo-center'], true) ? $settings['header_layout'] : 'logo-center';
+    $footerLayout = in_array($settings['footer_layout'] ?? '', ['three-columns', 'two-columns', 'simple'], true) ? $settings['footer_layout'] : 'three-columns';
+    $menuLayout = in_array($settings['menu_layout'] ?? '', ['primary', 'compact'], true) ? $settings['menu_layout'] : 'primary';
+    $bodyClasses = [];
+    if (basename($_SERVER['PHP_SELF'] ?? '') === 'admin.php' && empty($_SESSION['admin_id'])) {
+        $bodyClasses[] = 'portal-login-page';
+    }
+    $bodyClass = $bodyClasses === [] ? '' : ' class="' . h(implode(' ', $bodyClasses)) . '"';
     $links = [
         'home' => ['Home', 'index.php'],
         'news' => ['News', 'index.php?type=news'],
         'announcements' => ['Announcements', 'index.php?type=announcements'],
         'events' => ['Events', 'index.php?type=events'],
-        'programs' => ['Programs', 'index.php?type=programs'],
         'directory' => ['Directory', 'index.php?type=directory'],
         'contact' => ['Contact', 'index.php?contact=1'],
     ];
-    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . h($title ? "$title | $site" : $site) . '</title><link rel="stylesheet" href="assets/style.css?v=portal-clone2"></head><body' . $bodyClass . '><header class="top"><div class="portal-masthead"><a class="brand" href="index.php"><img class="psu-logo" src="' . h($logoUrl) . '" alt="' . h($university) . ' logo"><span class="brand-copy"><strong>' . h($university) . '</strong><small>Urdaneta City Campus</small></span></a><span class="portal-title">CAMPUS PORTAL</span></div><nav>';
+    if ($menuLayout !== 'compact') {
+        $links = array_merge(
+            array_slice($links, 0, 4, true),
+            ['programs' => ['Academics', 'index.php?type=programs']],
+            array_slice($links, 4, null, true)
+        );
+    }
+    echo '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' . h($title ? "$title | $site" : $site) . '</title><link rel="stylesheet" href="assets/style.css?v=portal-clone2"><link rel="stylesheet" href="assets/layout.css"></head><body' . $bodyClass . ' data-header-layout="' . h($headerLayout) . '" data-footer-layout="' . h($footerLayout) . '" data-menu-layout="' . h($menuLayout) . '"><header class="top"><div class="portal-masthead"><a class="brand" href="index.php"><img class="psu-logo" src="' . h($logoUrl) . '" alt="' . h($university) . ' logo"><span class="brand-copy"><strong>' . h($university) . '</strong><small>Urdaneta City Campus</small></span></a><span class="portal-title">CAMPUS PORTAL</span></div><nav>';
     foreach ($links as $key => [$label, $href]) {
         $current = $activeNav === $key ? ' class="current" aria-current="page"' : '';
         echo '<a href="' . h($href) . '"' . $current . '>' . h($label) . '</a>';
@@ -400,5 +413,49 @@ function site_footer(): void
     global $pdo;
     $settings = public_site_settings($pdo);
     $site = trim((string) ($settings['website_name'] ?? '')) ?: 'University Content Management System';
-    echo '</main><footer class="footer">' . h($site) . '</footer><script src="assets/app.js" defer></script></body></html>';
+    $layout = in_array($settings['footer_layout'] ?? '', ['three-columns', 'two-columns', 'simple'], true)
+        ? $settings['footer_layout']
+        : 'three-columns';
+    $hasAddress = trim((string) ($settings['official_address'] ?? '')) !== '';
+    $hasContact = trim((string) ($settings['contact_number'] ?? '')) !== ''
+        || trim((string) ($settings['official_email'] ?? '')) !== '';
+    $footerClasses = 'footer layout-footer layout-footer-' . h($layout);
+    if ($layout !== 'simple' && !$hasAddress && !$hasContact) {
+        $footerClasses .= ' layout-footer-no-details';
+    }
+    echo '</main><footer class="' . $footerClasses . '">';
+    echo '<section class="layout-footer-site"><h2>' . h($site) . '</h2>';
+    if (!empty($settings['website_description'])) {
+        echo '<p>' . h($settings['website_description']) . '</p>';
+    }
+    echo '</section>';
+    if ($layout === 'two-columns' && ($hasAddress || $hasContact)) {
+        echo '<section class="layout-footer-details"><h2>Contact information</h2>';
+        if ($hasAddress) {
+            echo '<p>' . h($settings['official_address']) . '</p>';
+        }
+        if (!empty($settings['contact_number'])) {
+            echo '<p>' . h($settings['contact_number']) . '</p>';
+        }
+        if (!empty($settings['official_email'])) {
+            echo '<p><a href="mailto:' . h($settings['official_email']) . '">' . h($settings['official_email']) . '</a></p>';
+        }
+        echo '</section>';
+    } elseif ($layout === 'three-columns') {
+        if ($hasAddress) {
+            echo '<section class="layout-footer-address"><h2>Address</h2>';
+            echo '<p>' . h($settings['official_address']) . '</p></section>';
+        }
+        if ($hasContact) {
+            echo '<section class="layout-footer-contact"><h2>Contact</h2>';
+            if (!empty($settings['contact_number'])) {
+                echo '<p>' . h($settings['contact_number']) . '</p>';
+            }
+            if (!empty($settings['official_email'])) {
+                echo '<p><a href="mailto:' . h($settings['official_email']) . '">' . h($settings['official_email']) . '</a></p>';
+            }
+            echo '</section>';
+        }
+    }
+    echo '</footer><script src="assets/app.js" defer></script></body></html>';
 }

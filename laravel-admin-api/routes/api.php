@@ -106,6 +106,11 @@ Route::middleware([LocalPrototypeOnly::class, 'web', 'auth:web', 'cms.json', 'cm
     Route::put('/media/{id}', [CmsContentController::class, 'mediaUpdate'])->whereNumber('id');
     Route::delete('/media/{id}', [CmsContentController::class, 'mediaDestroy'])->whereNumber('id');
 
+    Route::get('/document-categories', [CmsContentController::class, 'documentCategoriesIndex']);
+    Route::post('/document-categories', [CmsContentController::class, 'documentCategoryStore']);
+    Route::put('/document-categories/{id}', [CmsContentController::class, 'documentCategoryUpdate'])->whereNumber('id');
+    Route::delete('/document-categories/{id}', [CmsContentController::class, 'documentCategoryDestroy'])->whereNumber('id');
+
     Route::get('/documents', [CmsContentController::class, 'documentsIndex']);
     Route::post('/documents', [CmsContentController::class, 'documentStore']);
     Route::put('/documents/{id}', [CmsContentController::class, 'documentUpdate'])->whereNumber('id');
@@ -149,6 +154,13 @@ Route::middleware([LocalPrototypeOnly::class, 'web'])->group(function (): void {
     Route::get('/contact/options', [MessageController::class, 'options']);
     Route::post('/contact-submissions', [MessageController::class, 'store'])->middleware('cms.json');
 });
+
+Route::get('/public/media/{id}', [CmsContentController::class, 'publicMediaShow'])
+    ->whereNumber('id')
+    ->name('cms.public.media');
+Route::get('/public/documents/{id}', [CmsContentController::class, 'publicDocumentShow'])
+    ->whereNumber('id')
+    ->name('cms.public.document');
 
 
 

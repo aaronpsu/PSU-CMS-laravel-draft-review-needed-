@@ -2,8 +2,8 @@
    layout.js — behavior for the shared sidebar and header.
    The sidebar/header HTML itself sits inside each page between
    "BEGIN SHARED" / "END SHARED" comments (so it can become a PHP include).
-   This file only: marks the active link, opens/closes menu groups, runs the
-   mobile drawer, and handles header search + "coming soon" links.
+   This file also builds the consistent navigation for the integrated
+   personnel, resource, and website-layout screens.
    Set <body data-page="all-news"> to choose the active sidebar link.
    ========================================================================== */
 window.CMS = window.CMS || {};
@@ -22,6 +22,184 @@ CMS.layout = (function () {
     group.classList.toggle('is-open', open);
     var toggle = group.querySelector('.cms-nav-toggle');
     if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
+  function resourceGroup(anchor, name, iconName, links) {
+    var group = document.createElement('div');
+    group.className = 'cms-nav-group';
+    group.setAttribute('data-group', name);
+
+    var toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'cms-nav-link cms-nav-toggle';
+    toggle.setAttribute('aria-expanded', 'false');
+    var subnavId = 'subnav-' + name;
+    toggle.setAttribute('aria-controls', subnavId);
+    toggle.appendChild(CMS.ui.el('i', { class: 'bi bi-' + iconName, 'aria-hidden': 'true' }));
+    toggle.appendChild(CMS.ui.el('span', { class: 'cms-nav-text', text: name === 'documents' ? 'Document Library' : 'Media Library' }));
+    toggle.appendChild(CMS.ui.el('span', { class: 'cms-nav-caret', 'aria-hidden': 'true' }));
+    group.appendChild(toggle);
+
+    var subnav = document.createElement('div');
+    subnav.className = 'cms-subnav';
+    subnav.id = subnavId;
+    links.forEach(function (item) {
+      var link = CMS.ui.el('a', {
+        class: 'cms-nav-link',
+        href: new URL(item.path, layoutScript.src).href,
+        'data-nav': item.page
+      }, [CMS.ui.el('span', { class: 'cms-nav-text', text: item.label })]);
+      subnav.appendChild(link);
+    });
+    group.appendChild(subnav);
+    anchor.parentNode.replaceChild(group, anchor);
+  }
+
+  function installResourceNavigation() {
+    var sidebar = document.querySelector('.cms-sidebar');
+    if (!sidebar || !layoutScript) return;
+
+    var categoriesLink = sidebar.querySelector('.cms-nav-link[data-nav="document-categories"]');
+    if (categoriesLink) categoriesLink.remove();
+
+    var documentsLink = sidebar.querySelector('.cms-nav-link[data-nav="documents"]');
+    if (documentsLink && !documentsLink.closest('.cms-nav-group')) {
+      resourceGroup(documentsLink, 'documents', 'file-earmark-text', [
+        { label: 'All Documents', page: 'documents', path: '../resources/library.html?type=documents' },
+        { label: 'Upload Document', page: 'upload-document', path: '../resources/upload-document.html' },
+        { label: 'Document Categories', page: 'document-categories', path: '../resources/library.html?type=categories' }
+      ]);
+    }
+
+    var mediaLink = sidebar.querySelector('.cms-nav-link[data-nav="media"]');
+    if (mediaLink && !mediaLink.closest('.cms-nav-group')) {
+      resourceGroup(mediaLink, 'media', 'image', [
+        { label: 'All Media', page: 'media', path: '../resources/library.html?type=media' },
+        { label: 'Upload Media', page: 'upload-media', path: '../resources/upload-media.html' }
+      ]);
+    }
+  }
+
+  function installIntegratedAdminNavigation() {
+    var page = document.body.getAttribute('data-page');
+    var supportedPages = {
+      personnel: true,
+      'personnel-form': true,
+      'resource-library': true,
+      'upload-document': true,
+      'upload-media': true,
+      'website-layout': true
+    };
+    var nav = document.querySelector('.cms-sidebar nav[aria-label="Main navigation"]');
+    if (!supportedPages[page] || !nav || !layoutScript) return;
+
+    function link(item) {
+      var children = [];
+      if (item.icon) children.push(CMS.ui.el('i', { class: 'bi bi-' + item.icon, 'aria-hidden': 'true' }));
+      children.push(CMS.ui.el('span', { class: 'cms-nav-text', text: item.label }));
+      return CMS.ui.el('a', {
+        class: 'cms-nav-link',
+        href: new URL(item.path, layoutScript.src).href,
+        'data-nav': item.page
+      }, children);
+    }
+
+    function group(item) {
+      var groupElement = document.createElement('div');
+      groupElement.className = 'cms-nav-group';
+      groupElement.setAttribute('data-group', item.name);
+
+      var toggle = CMS.ui.el('button', {
+        type: 'button',
+        class: 'cms-nav-link cms-nav-toggle',
+        'aria-expanded': 'false',
+        'aria-controls': 'subnav-' + item.name
+      }, [
+        CMS.ui.el('i', { class: 'bi bi-' + item.icon, 'aria-hidden': 'true' }),
+        CMS.ui.el('span', { class: 'cms-nav-text', text: item.label }),
+        CMS.ui.el('span', { class: 'cms-nav-caret', 'aria-hidden': 'true' })
+      ]);
+      if (item.name === 'users') toggle.setAttribute('data-nav', 'users');
+      groupElement.appendChild(toggle);
+
+      var subnav = document.createElement('div');
+      subnav.className = 'cms-subnav';
+      subnav.id = 'subnav-' + item.name;
+      item.links.forEach(function (child) { subnav.appendChild(link(child)); });
+      groupElement.appendChild(subnav);
+      return groupElement;
+    }
+
+    var sections = [
+      { label: 'Main', links: [
+        { label: 'Dashboard', page: 'dashboard', path: '../dashboard/dashboard.html', icon: 'columns-gap' }
+      ] },
+      { label: 'Website content', links: [
+        { label: 'Homepage Management', page: 'homepage', path: '../homapage/homepage-mg.html', icon: 'house' },
+        { name: 'news', label: 'News & Announcements', icon: 'journal-text', links: [
+          { label: 'All News', page: 'all-news', path: '../news/all-news.html' },
+          { label: 'Add New News', page: 'add-news', path: '../news/add-news.html' },
+          { label: 'All Announcements', page: 'all-announcements', path: '../announcements/all-announcements.html' },
+          { label: 'Add New Announcement', page: 'add-announcement', path: '../announcements/add-announcement.html' },
+          { label: 'News & Announcement Categories', page: 'content-categories', path: '../categories/content-categories.html' }
+        ] },
+        { name: 'events', label: 'Events Management', icon: 'calendar', links: [
+          { label: 'All Events', page: 'all-events', path: '../events/all-events.html' },
+          { label: 'Add New Event', page: 'add-event', path: '../events/add-event.html' },
+          { label: 'Event Categories', page: 'event-categories', path: '../events/event-categories.html' }
+        ] },
+        { name: 'university', label: 'University Structure', icon: 'bank', links: [
+          { label: 'Colleges', page: 'colleges', path: '../colleges/colleges.html' },
+          { label: 'Departments', page: 'departments', path: '../departments/departments.html' },
+          { label: 'Academic Programs', page: 'programs', path: '../programs/academic-programs.html' },
+          { label: 'Campuses', page: 'campuses', path: '../campuses/campuses.html' }
+        ] },
+        { name: 'faculty', label: 'Faculty & Staff Directory', icon: 'people', links: [
+          { label: 'All Personnel', page: 'personnel', path: '../faculty/index.html' },
+          { label: 'Add New Personnel', page: 'add-personnel', path: '../faculty/personnel-form.html' }
+        ] }
+      ] },
+      { label: 'Resources', links: [
+        { label: 'Document Library', page: 'documents', path: '../resources/library.html?type=documents', icon: 'file-earmark-text' },
+        { label: 'Media Library', page: 'media', path: '../resources/library.html?type=media', icon: 'image' },
+        { label: 'Document Categories', page: 'document-categories', path: '../resources/library.html?type=categories', icon: 'folder' }
+      ] },
+      { label: 'Communication', links: [
+        { name: 'contact', label: 'Contact & Feedback', icon: 'envelope', links: [
+          { label: 'All Messages', page: 'all-messages', path: '../messages/all-messages.html' },
+          { label: 'Unread Messages', page: 'unread-messages', path: '../messages/unread-messages.html' },
+          { label: 'Feedback', page: 'feedback', path: '../messages/feedback.html' }
+        ] },
+        { label: 'Search', page: 'search', path: '../search/search-results.html', icon: 'search' }
+      ] },
+      { label: 'System', links: [
+        { name: 'users', label: 'User Management', icon: 'person', links: [
+          { label: 'All Users', page: 'all-users', path: '../users/all-users.html' },
+          { label: 'Add New User', page: 'add-user', path: '../users/add-user.html' },
+          { label: 'User Roles', page: 'user-roles', path: '../users/user-roles.html' }
+        ] },
+        { name: 'settings', label: 'Settings', icon: 'sliders', links: [
+          { label: 'General Settings', page: 'general-settings', path: '../system/system-gen.html' },
+          { label: 'Website Information', page: 'website-information', path: '../system/system-web-info.html' },
+          { label: 'Account Settings', page: 'account-settings', path: '../settings/account-settings.html' },
+          { label: 'Security Settings', page: 'security-settings', path: '../settings/security-settings.html' }
+        ] }
+      ] },
+      { links: [
+        { name: 'appearance', label: 'Appearance', icon: 'palette', links: [
+          { label: 'Theme Settings', page: 'theme-settings', path: '../settings/theme-settings.html' },
+          { label: 'Website Layout', page: 'website-layout', path: '../settings/website-layout.html' }
+        ] }
+      ] }
+    ];
+
+    CMS.ui.clear(nav);
+    sections.forEach(function (section) {
+      if (section.label) nav.appendChild(CMS.ui.el('p', { class: 'cms-nav-label', text: section.label }));
+      section.links.forEach(function (item) {
+        nav.appendChild(item.links ? group(item) : link(item));
+      });
+    });
   }
 
   function loadApiClient() {
@@ -287,6 +465,8 @@ CMS.layout = (function () {
   }
 
   function initLayout(user) {
+    installIntegratedAdminNavigation();
+
     var pendingPages = {
       dashboard: '../dashboard/dashboard.html',
       homepage: '../homapage/homepage-mg.html',
@@ -409,9 +589,10 @@ CMS.layout = (function () {
     //     .forEach(function (link) { settingsSubnavElement.appendChild(link); });
     // }
     
+    var userManagementGroup = document.querySelector('.cms-sidebar .cms-nav-group[data-group="users"]');
+    var settingsGroupElement = document.querySelector('.cms-sidebar .cms-nav-group[data-group="settings"]');
     if (String(user.role || '').toLowerCase() !== 'admin') {
-      var userManagementLink = document.querySelector('.cms-sidebar .cms-nav-link[data-nav="users"]');
-      if (userManagementLink) userManagementLink.hidden = true;
+      if (userManagementGroup) userManagementGroup.hidden = true;
       if (settingsGroupElement) settingsGroupElement.hidden = true;
     }
 
@@ -430,7 +611,15 @@ CMS.layout = (function () {
     /* 1. active link + its group */
     var page = document.body.getAttribute('data-page');
     if (page === 'resource-library') {
-      page = new URLSearchParams(window.location.search).get('type') === 'media' ? 'media' : 'documents';
+      var resourceType = new URLSearchParams(window.location.search).get('type');
+      page = resourceType === 'media' ? 'media' : (resourceType === 'categories' ? 'document-categories' : 'documents');
+    }
+    if (page === 'personnel-form') page = 'add-personnel';
+    installResourceNavigation();
+    var pendingLayoutLink = document.querySelector('.cms-nav-link[data-nav="website-layout"][data-pending]');
+    if (pendingLayoutLink && layoutScript) {
+      pendingLayoutLink.href = new URL('../settings/website-layout.html', layoutScript.src).href;
+      pendingLayoutLink.removeAttribute('data-pending');
     }
     var link = page ? document.querySelector('.cms-nav-link[data-nav="' + page + '"]') : null;
     if (link) {

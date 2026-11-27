@@ -1,219 +1,471 @@
 (function () {
   var ui = CMS.ui, el = ui.el, api = CMS.api;
+  var PAGE_SIZE = 8;
+  var DOCUMENT_TYPES = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'png', 'jpg', 'jpeg'];
+
+  function fileType(file) {
+    var match = /\.([a-z0-9]+)$/i.exec(file.fileName || '');
+    return match ? match[1].toLowerCase() : String(file.mimeType || '').split('/').pop().toLowerCase();
+  }
+
+  function formattedDate(value) {
+    return ui.formatDate(value) || '—';
+  }
+
+  function actionLink(label, href, accessibleName) {
+    return el('a', { class: 'cms-action', href: href, text: label, 'aria-label': accessibleName });
+  }
 
   function init() {
-    var type = new URLSearchParams(window.location.search).get('type') === 'media' ? 'media' : 'documents';
+    var type = new URLSearchParams(window.location.search).get('type') || 'documents';
+    var categoriesPage = type === 'categories';
     var media = type === 'media';
-    var endpoint = media ? '/media' : '/documents';
-    var title = media ? 'Media Library' : 'Document Library';
-    var state = { q: '', rows: [], page: 1, request: 0 };
+    var title = categoriesPage ? 'Document Categories' : (media ? 'Media Library' : 'Document Library');
+    var pageSize = PAGE_SIZE;
+    var state = { rows: [], categories: [], page: 1, request: 0 };
+    var search = document.getElementById('resourceSearch');
+    var categoryFilter = document.getElementById('resourceCategoryFilter');
+    var typeFilter = document.getElementById('resourceTypeFilter');
+    var viewFilter = document.getElementById('resourceViewFilter');
+    var categoryFilterWrap = document.getElementById('resourceCategoryFilterWrap');
+    var typeFilterWrap = document.getElementById('resourceTypeFilterWrap');
+    var viewFilterWrap = document.getElementById('resourceViewFilterWrap');
+    var upload = document.getElementById('resourceUpload');
+    var categoryLink = document.getElementById('resourceCategories');
+    var head = document.getElementById('resourceHead');
     var body = document.getElementById('resourceBody');
-    var wrap = document.getElementById('resourceTableWrap');
+    var table = document.getElementById('resourceTableWrap');
+    var grid = document.getElementById('resourceMediaGrid');
     var empty = document.getElementById('resourceEmpty');
     var footer = document.getElementById('resourceFooter');
-    var search = document.getElementById('resourceSearch');
-    var pageSize = 10;
 
     document.title = title + ' | PSU CMS';
     document.getElementById('resourceTitle').textContent = title;
-    document.getElementById('resourceSubtitle').textContent = media
-      ? 'Upload and manage images stored in the CMS media table.'
-      : 'Upload and manage files stored in the CMS documents table.';
     document.getElementById('resourceCrumb').textContent = title;
-    ui.clear(document.getElementById('resourceHead'));
-    (media ? ['Preview', 'File name', 'Alt text', 'File size', 'Status', 'Actions']
-      : ['Title', 'File name', 'Type', 'File size', 'Status', 'Actions']).forEach(function (label) {
-      document.getElementById('resourceHead').appendChild(el('th', { scope: 'col', text: label }));
+    document.getElementById('resourceSubtitle').textContent = categoriesPage
+      ? 'Organize documents using the categories stored in the CMS database.'
+      : (media
+        ? 'Manage images and their metadata stored in the CMS media table.'
+        : 'Manage files, categories, and descriptions stored in the CMS documents table.');
+
+    if (categoriesPage) {
+      upload.hidden = true;
+      categoryLink.hidden = true;
+      categoryFilterWrap.hidden = true;
+      typeFilterWrap.hidden = true;
+      viewFilterWrap.hidden = true;
+      var addCategoryButton = el('button', {
+        type: 'button',
+        class: 'cms-btn cms-btn-primary',
+        text: '+ Add Category',
+        'data-category-add': ''
+      });
+      document.getElementById('resourceFilters').appendChild(addCategoryButton);
+      renderHead(['Category Name', 'Description', 'Documents', 'Actions']);
+      addCategoryButton.addEventListener('click', function () { openCategoryForm(null); });
+      search.addEventListener('input', ui.debounce(function () {
+        state.page = 1;
+        renderCategories();
+      }, 180));
+      body.addEventListener('click', handleCategoryAction);
+      loadCategories();
+      return;
+    }
+
+    upload.href = media ? 'upload-media.html' : 'upload-document.html';
+    categoryLink.hidden = media;
+    categoryFilterWrap.hidden = media;
+    typeFilterWrap.hidden = false;
+    viewFilterWrap.hidden = !media;
+    if (media) {
+      ui.setOptions(typeFilter, [{ value: '', label: 'All File Types' }].concat(
+        ['jpg', 'png', 'gif', 'webp'].map(function (extension) {
+          return { value: extension, label: extension.toUpperCase() };
+        })
+      ));
+      renderHead(['Preview', 'Name', 'Type', 'Dimensions', 'File Size', 'Uploaded', 'Actions']);
+    } else {
+      ui.setOptions(typeFilter, [{ value: '', label: 'All File Types' }].concat(
+        DOCUMENT_TYPES.map(function (extension) { return { value: extension, label: extension.toUpperCase() }; })
+      ));
+      renderHead(['Title', 'Type', 'Category', 'File Size', 'Uploaded', 'By', 'Actions']);
+      ui.setOptions(categoryFilter, [{ value: '', label: 'All Categories' }]);
+    }
+
+    var initialCategory = new URLSearchParams(window.location.search).get('category') || '';
+    search.addEventListener('input', ui.debounce(function () {
+      state.page = 1;
+      loadLibrary();
+    }, 180));
+    typeFilter.addEventListener('change', function () { state.page = 1; renderLibrary(); });
+    if (media) {
+      viewFilter.addEventListener('change', function () { state.page = 1; renderLibrary(); });
+    } else {
+      categoryFilter.addEventListener('change', function () { state.page = 1; renderLibrary(); });
+    }
+    loadLibrary().then(function () {
+      if (initialCategory) {
+        categoryFilter.value = initialCategory;
+        ui.syncSelect(categoryFilter);
+        renderLibrary();
+      }
     });
 
-    function render() {
-      var pages = Math.max(1, Math.ceil(state.rows.length / pageSize));
+    function renderHead(labels) {
+      ui.clear(head);
+      labels.forEach(function (label) { head.appendChild(el('th', { scope: 'col', text: label })); });
+    }
+
+    function loadLibrary() {
+      var request = ++state.request;
+      var operation = media
+        ? api.query('/media', { q: search.value.trim() }).then(function (rows) {
+          return { rows: rows, categories: [] };
+        })
+        : Promise.all([
+          api.query('/documents', { q: search.value.trim() }),
+          api.get('/document-categories')
+        ]).then(function (result) {
+          return { rows: result[0], categories: result[1] };
+        });
+
+      return operation.then(function (result) {
+        if (request !== state.request) return;
+        state.rows = result.rows;
+        state.categories = result.categories;
+        state.page = 1;
+        if (!media) {
+          var options = [{ value: '', label: 'All Categories' }].concat(state.categories.map(function (category) {
+            return { value: String(category.id), label: category.name };
+          }));
+          ui.setOptions(categoryFilter, options, categoryFilter.value);
+        }
+        renderLibrary();
+      }).catch(function (error) {
+        if (request !== state.request) return;
+        renderError(error, 'Unable to load ' + title.toLowerCase());
+      });
+    }
+
+    function filteredRows() {
+      return state.rows.filter(function (file) {
+        if (!media && categoryFilter.value && String(file.categoryId) !== categoryFilter.value) return false;
+        if (typeFilter.value && fileType(file) !== typeFilter.value) return false;
+        return true;
+      });
+    }
+
+    function renderLibrary() {
+      var rows = filteredRows();
+      var pages = Math.max(1, Math.ceil(rows.length / pageSize));
       state.page = Math.min(state.page, pages);
+      var pageRows = rows.slice((state.page - 1) * pageSize, state.page * pageSize);
       ui.clear(body);
-      if (!state.rows.length) {
-        wrap.hidden = true;
-        footer.hidden = true;
+      ui.clear(grid);
+      ui.clear(footer);
+
+      if (!pageRows.length) {
+        table.hidden = true;
+        grid.hidden = true;
         empty.hidden = false;
         ui.renderEmpty(empty, {
-          title: state.q ? 'No matching files found' : 'No files yet',
-          text: state.q ? 'Try another search.' : 'Files you upload will appear here.',
-          actionLabel: state.q ? null : '+ Upload',
-          actionHref: '#'
-        });
-        var emptyUpload = empty.querySelector('a');
-        if (emptyUpload) emptyUpload.addEventListener('click', function (event) {
-          event.preventDefault();
-          openUpload();
+          title: rows.length || search.value.trim() ? 'No matching files found' : 'No files yet',
+          text: rows.length || search.value.trim() ? 'Try changing your search or filters.' : 'Files you upload will appear here.',
+          actionLabel: rows.length || search.value.trim() ? null : '+ Upload',
+          actionHref: upload.href
         });
         return;
       }
 
-      wrap.hidden = false;
       empty.hidden = true;
-      footer.hidden = false;
-      state.rows.slice((state.page - 1) * pageSize, state.page * pageSize).forEach(function (file) {
-        var row = el('tr');
-        if (media) {
-          row.appendChild(el('td', {}, [file.url
-            ? el('img', { class: 'cms-thumb', src: file.url, alt: file.altText || '' })
-            : el('span', { class: 'cms-thumb', 'aria-hidden': 'true' })]));
-          row.appendChild(el('td', { text: file.fileName }));
-          row.appendChild(el('td', { text: file.altText || '\u2014' }));
-        } else {
-          row.appendChild(el('td', { text: file.title || '\u2014' }));
-          row.appendChild(el('td', { text: file.fileName }));
-          row.appendChild(el('td', { text: file.mimeType || '\u2014' }));
-        }
-        row.appendChild(el('td', { text: ui.formatSize(file.fileSize) || '\u2014' }));
-        row.appendChild(el('td', { text: file.available ? 'Available' : 'File missing' }));
-        row.appendChild(actions(file));
-        body.appendChild(row);
-      });
+      if (media && viewFilter.value === 'grid') {
+        table.hidden = true;
+        grid.hidden = false;
+        pageRows.forEach(function (file) { grid.appendChild(mediaCard(file)); });
+      } else {
+        table.hidden = false;
+        grid.hidden = true;
+        pageRows.forEach(function (file) { body.appendChild(media ? mediaRow(file) : documentRow(file)); });
+      }
       ui.renderFooter(footer, {
-        page: state.page, pageSize: pageSize, total: state.rows.length,
-        onPage: function (page) { state.page = page; render(); }
+        page: state.page,
+        pageSize: pageSize,
+        total: rows.length,
+        onPage: function (page) { state.page = page; renderLibrary(); }
       });
     }
 
-    function actions(file) {
-      var view = el('button', { type: 'button', class: 'cms-action', text: 'View', 'aria-label': 'View ' + file.fileName });
-      var edit = el('button', { type: 'button', class: 'cms-action', text: 'Edit', 'aria-label': 'Edit ' + file.fileName });
-      var remove = el('button', { type: 'button', class: 'cms-action cms-action-danger', text: 'Delete', 'aria-label': 'Delete ' + file.fileName });
-      view.disabled = !file.available;
-      view.addEventListener('click', function () { showFile(file); });
-      edit.addEventListener('click', function () { openEdit(file); });
-      remove.addEventListener('click', function () { deleteFile(file); });
-      return el('td', {}, [el('div', { class: 'cms-actions' }, [view, edit, remove])]);
+    function documentRow(file) {
+      var row = el('tr');
+      row.appendChild(el('td', { class: 'cms-cell-title', text: file.title || file.fileName }));
+      row.appendChild(el('td', { text: fileType(file).toUpperCase() }));
+      row.appendChild(el('td', { text: file.categoryName || 'Uncategorized' }));
+      row.appendChild(el('td', { text: ui.formatSize(file.fileSize) || '—' }));
+      row.appendChild(el('td', { text: formattedDate(file.createdAt) }));
+      row.appendChild(el('td', { text: file.uploadedBy || '—' }));
+      row.appendChild(resourceActions(file, false));
+      return row;
     }
 
-    function load() {
-      var request = ++state.request;
-      return api.query(endpoint, { q: search.value.trim() }).then(function (rows) {
-        if (request !== state.request) return;
-        state.rows = rows;
-        state.q = search.value.trim();
-        state.page = 1;
-        render();
-      }).catch(function (error) {
-        if (request !== state.request) return;
-        ui.clear(body);
-        wrap.hidden = true;
-        footer.hidden = true;
-        empty.hidden = false;
-        ui.renderEmpty(empty, { title: 'Unable to load ' + title.toLowerCase(), text: error.message });
-        ui.toast(error.message, 'error');
-      });
-    }
-
-    function showFile(file) {
-      var link = el('a', { href: file.url, target: '_blank', rel: 'noopener', text: media ? 'Open image' : 'Download file' });
-      ui.showDetails({
-        title: file.title || file.fileName,
-        rows: [
-          ['File name', file.fileName], ['Type', file.mimeType], ['File size', ui.formatSize(file.fileSize)],
-          [media ? 'Alt text' : 'Title', media ? file.altText : file.title],
-          ['Uploaded', file.createdAt], ['File', link]
-        ]
-      });
-    }
-
-    function openUpload() {
-      var fileInput = el('input', { class: 'cms-input', type: 'file', accept: media ? 'image/png,image/jpeg,image/gif,image/webp' : '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.png,.jpg,.jpeg' });
-      var titleInput = media ? null : el('input', { class: 'cms-input', type: 'text', maxlength: '255', placeholder: 'Optional document title' });
-      var altInput = media ? el('input', { class: 'cms-input', type: 'text', maxlength: '255', placeholder: 'Describe the image' }) : null;
-      var hint = el('p', { class: 'cms-field-hint', text: media ? 'Images up to 5 MB are supported.' : 'Documents up to 300 KB are supported.' });
-      var content = [field('File', fileInput)];
-      if (titleInput) content.push(field('Title', titleInput));
-      if (altInput) content.push(field('Alt text', altInput));
-      content.push(hint);
-      var save = el('button', { type: 'button', class: 'cms-btn cms-btn-primary', text: 'Upload' });
-      var modalEl = ui.modalShell(media ? 'Upload Image' : 'Upload Document', content, [
-        el('button', { type: 'button', class: 'cms-btn cms-btn-outline', 'data-bs-dismiss': 'modal', text: 'Cancel' }),
-        save
-      ]);
-      var modal = ui.openModal(modalEl);
-      save.addEventListener('click', function () {
-        var file = fileInput.files && fileInput.files[0];
-        if (!file) {
-          ui.toast('Choose a file to upload.', 'error');
-          return;
+    function mediaRow(file) {
+      var row = el('tr');
+      var preview = file.url && file.available
+        ? el('img', { class: 'cms-thumb', src: file.url, alt: file.altText || '' })
+        : el('span', { class: 'cms-thumb', 'aria-hidden': 'true' });
+      var dimensions = el('td', { text: '—' });
+      function setDimensions() {
+        if (preview.naturalWidth && preview.naturalHeight) {
+          dimensions.textContent = preview.naturalWidth + ' \u00D7 ' + preview.naturalHeight;
         }
-        var maxSize = media ? 5 * 1024 * 1024 : 300 * 1024;
-        if (file.size > maxSize) {
-          ui.toast(media ? 'Images over 5 MB are not supported.' : 'Documents over 300 KB are not supported.', 'error');
-          return;
+      }
+      if (preview.tagName === 'IMG') {
+        preview.addEventListener('load', setDimensions);
+        if (preview.complete) setDimensions();
+      }
+      row.appendChild(el('td', {}, [preview]));
+      row.appendChild(el('td', { class: 'cms-cell-title', text: file.title || file.fileName }));
+      row.appendChild(el('td', { text: fileType(file).toUpperCase() }));
+      row.appendChild(dimensions);
+      row.appendChild(el('td', { text: ui.formatSize(file.fileSize) || '—' }));
+      row.appendChild(el('td', { text: formattedDate(file.createdAt) }));
+      row.appendChild(resourceActions(file, true));
+      return row;
+    }
+
+    function resourceActions(file, isMedia) {
+      var editHref = isMedia ? 'upload-media.html?id=' : 'upload-document.html?id=';
+      var actions = [
+        actionLink('Edit', editHref + encodeURIComponent(file.id), 'Edit ' + (file.title || file.fileName))
+      ];
+      if (file.available && file.url) {
+        var viewUrl = isMedia ? file.url : file.url + '?download=0';
+        actions.unshift(actionLink('View', viewUrl, 'View ' + file.fileName));
+        actions[0].target = '_blank';
+        actions[0].rel = 'noopener';
+        if (!isMedia) {
+          actions.splice(1, 0, actionLink('Download', file.url, 'Download ' + file.fileName));
         }
-        save.disabled = true;
-        readDataUrl(file).then(function (data) {
-          var payload = media
-            ? { data: data, altText: altInput.value.trim() }
-            : { data: data, fileName: file.name, title: titleInput.value.trim() };
-          return api.post(endpoint, payload);
-        }).then(function () {
-          modal.hide();
-          ui.toast('File uploaded.', 'success');
-          return load();
-        }).catch(function (error) {
-          ui.toast(error.message, 'error');
-        }).finally(function () { save.disabled = false; });
-      });
+      } else {
+        actions.unshift(el('span', { class: 'cms-action', text: 'Missing file', 'aria-disabled': 'true' }));
+      }
+      actions.push(el('button', {
+        type: 'button',
+        class: 'cms-action cms-action-danger',
+        text: 'Delete',
+        'data-resource-delete': String(file.id),
+        'data-resource-name': file.title || file.fileName
+      }));
+      var cell = el('td', {}, [el('div', { class: 'cms-actions' }, actions)]);
+      return cell;
     }
 
-    function openEdit(file) {
-      var input = el('input', { class: 'cms-input', type: 'text', maxlength: '255' });
-      input.value = media ? file.altText || '' : file.title || '';
-      var modalEl = ui.modalShell(media ? 'Edit Alt Text' : 'Edit Document Title', [
-        field(media ? 'Alt text' : 'Title', input)
-      ], [
-        el('button', { type: 'button', class: 'cms-btn cms-btn-outline', 'data-bs-dismiss': 'modal', text: 'Cancel' }),
-        el('button', { type: 'button', class: 'cms-btn cms-btn-primary', text: 'Save Changes' })
+    function mediaCard(file) {
+      var thumbnail = file.url && file.available
+        ? el('img', { src: file.url, alt: file.altText || '' })
+        : el('span', { text: 'Preview unavailable' });
+      return el('article', { class: 'cms-card res-media-card' }, [
+        el('div', { class: 'res-media-thumb' }, [thumbnail]),
+        el('h2', { class: 'res-media-name', text: file.title || file.fileName }),
+        el('p', { class: 'res-media-meta', text: [
+          fileType(file).toUpperCase(), formattedDate(file.createdAt), ui.formatSize(file.fileSize) || '—'
+        ].join(' · ') }),
+        el('div', { class: 'cms-actions' }, [
+          actionLink('Edit', 'upload-media.html?id=' + encodeURIComponent(file.id), 'Edit ' + file.fileName),
+          el('button', {
+            type: 'button',
+            class: 'cms-action cms-action-danger',
+            text: 'Delete',
+            'data-resource-delete': String(file.id),
+            'data-resource-name': file.title || file.fileName
+          })
+        ])
       ]);
-      var modal = ui.openModal(modalEl);
-      modalEl.querySelector('.modal-footer .cms-btn-primary').addEventListener('click', function () {
-        var payload = media ? { altText: input.value.trim() } : { title: input.value.trim() };
-        api.put(endpoint + '/' + encodeURIComponent(file.id), payload).then(function () {
-          modal.hide();
-          ui.toast('File details updated.', 'success');
-          return load();
-        }).catch(function (error) { ui.toast(error.message, 'error'); });
-      });
     }
 
-    function deleteFile(file) {
+    document.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-resource-delete]');
+      if (!button) return;
+      var id = button.getAttribute('data-resource-delete');
+      var fileName = button.getAttribute('data-resource-name');
       ui.confirmDialog({
-        title: 'Delete file',
-        message: 'Delete \u201C' + file.fileName + '\u201D? Files used by content cannot be deleted.',
+        title: 'Delete resource',
+        message: 'Delete "' + fileName + '"? Resources used by published content cannot be deleted.',
         confirmLabel: 'Delete'
       }).then(function (confirmed) {
         if (!confirmed) return;
-        api.remove(endpoint + '/' + encodeURIComponent(file.id)).then(function () {
-          ui.toast('File deleted.', 'success');
-          return load();
+        return api.remove((media ? '/media/' : '/documents/') + encodeURIComponent(id)).then(function () {
+          ui.toast('Resource deleted.', 'success');
+          return loadLibrary();
         }).catch(function (error) { ui.toast(error.message, 'error'); });
+      });
+    });
+
+    function renderError(error, heading) {
+      state.rows = [];
+      ui.clear(body);
+      ui.clear(grid);
+      table.hidden = true;
+      grid.hidden = true;
+      footer.hidden = true;
+      empty.hidden = false;
+      ui.renderEmpty(empty, { title: heading, text: error.message, actionLabel: 'Try again', actionHref: '#' });
+      var retry = empty.querySelector('a');
+      if (retry) retry.addEventListener('click', function (event) {
+        event.preventDefault();
+        empty.hidden = true;
+        loadLibrary();
+      });
+      ui.toast(error.message, 'error');
+    }
+
+    function loadCategories() {
+      api.get('/document-categories').then(function (rows) {
+        state.rows = rows;
+        renderCategories();
+      }).catch(function (error) { renderError(error, 'Unable to load document categories'); });
+    }
+
+    function renderCategories() {
+      var query = search.value.trim().toLowerCase();
+      var rows = state.rows.filter(function (category) {
+        return !query || [category.name, category.description].join(' ').toLowerCase().indexOf(query) !== -1;
+      });
+      var pages = Math.max(1, Math.ceil(rows.length / pageSize));
+      state.page = Math.min(state.page, pages);
+      var pageRows = rows.slice((state.page - 1) * pageSize, state.page * pageSize);
+      ui.clear(body);
+      ui.clear(footer);
+      if (!pageRows.length) {
+        table.hidden = true;
+        empty.hidden = false;
+        ui.renderEmpty(empty, {
+          title: query ? 'No categories match your search' : 'No categories available',
+          text: query ? 'Try another search.' : 'Create a category to organize documents.',
+          actionLabel: query ? null : '+ Add Category',
+          actionHref: '#'
+        });
+        var add = empty.querySelector('a');
+        if (add) add.addEventListener('click', function (event) {
+          event.preventDefault();
+          openCategoryForm(null);
+        });
+        return;
+      }
+      empty.hidden = true;
+      table.hidden = false;
+      pageRows.forEach(function (category) {
+        var row = el('tr');
+        row.appendChild(el('td', { class: 'cms-cell-title', text: category.name }));
+        row.appendChild(el('td', { text: category.description || '—' }));
+        row.appendChild(el('td', { text: String(category.documentCount || 0) }));
+        row.appendChild(el('td', {}, [el('div', { class: 'cms-actions' }, [
+          actionLink('View', 'library.html?type=documents&category=' + encodeURIComponent(category.id), 'View documents in ' + category.name),
+          el('button', { type: 'button', class: 'cms-action', text: 'Edit', 'data-category-edit': String(category.id) }),
+          el('button', {
+            type: 'button',
+            class: 'cms-action cms-action-danger',
+            text: 'Delete',
+            'data-category-delete': String(category.id),
+            'data-category-name': category.name
+          })
+        ])]));
+        body.appendChild(row);
+      });
+      ui.renderFooter(footer, {
+        page: state.page,
+        pageSize: pageSize,
+        total: rows.length,
+        onPage: function (page) { state.page = page; renderCategories(); }
       });
     }
 
-    document.getElementById('resourceUpload').addEventListener('click', openUpload);
-    search.addEventListener('input', ui.debounce(load, 180));
-    load();
-  }
+    function field(label, input) {
+      return el('div', { class: 'cms-field' }, [
+        el('label', { class: 'cms-label', for: input.id, text: label }),
+        input,
+        el('p', { class: 'cms-field-error' })
+      ]);
+    }
 
-  function field(label, input) {
-    return el('div', { class: 'cms-field' }, [
-      el('label', { class: 'cms-label', text: label }), input
-    ]);
-  }
+    function openCategoryForm(category) {
+      var editing = Boolean(category);
+      var name = el('input', { id: 'resourceCategoryName', class: 'cms-input', type: 'text', maxlength: '80', required: true });
+      var description = el('textarea', { id: 'resourceCategoryDescription', class: 'cms-textarea', rows: '3', maxlength: '255' });
+      name.value = category ? category.name : '';
+      description.value = category ? category.description || '' : '';
+      var save = el('button', { type: 'button', class: 'cms-btn cms-btn-primary', text: editing ? 'Save Changes' : 'Add Category' });
+      var modalElement = ui.modalShell(editing ? 'Edit Document Category' : 'Add Document Category', [
+        field('Category Name', name),
+        field('Description', description)
+      ], [
+        el('button', { type: 'button', class: 'cms-btn cms-btn-outline', 'data-bs-dismiss': 'modal', text: 'Cancel' }),
+        save
+      ]);
+      var modal = ui.openModal(modalElement);
+      save.addEventListener('click', function () {
+        ui.clearErrors(modalElement);
+        if (!name.value.trim()) {
+          ui.setError(name, 'Category name is required.');
+          name.focus();
+          return;
+        }
+        save.disabled = true;
+        var payload = { name: name.value.trim(), description: description.value.trim() || null };
+        var request = editing
+          ? api.put('/document-categories/' + encodeURIComponent(category.id), payload)
+          : api.post('/document-categories', payload);
+        request.then(function () {
+          modal.hide();
+          ui.toast(editing ? 'Category updated.' : 'Category added.', 'success');
+          return loadCategories();
+        }).catch(function (error) {
+          ui.toast(error.message, 'error');
+        }).then(function () { save.disabled = false; });
+      });
+    }
 
-  function readDataUrl(file) {
-    return new Promise(function (resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function () {
-        if (typeof reader.result === 'string') resolve(reader.result);
-        else reject(new Error('The selected file could not be read.'));
-      };
-      reader.onerror = function () { reject(new Error('The selected file could not be read.')); };
-      reader.readAsDataURL(file);
+    document.getElementById('resourceFilters').addEventListener('submit', function (event) {
+      event.preventDefault();
     });
+    search.addEventListener('input', ui.debounce(function () {
+      state.page = 1;
+      if (categoriesPage) renderCategories();
+    }, 180));
+    function handleCategoryAction(event) {
+      var edit = event.target.closest('[data-category-edit]');
+      if (edit) {
+        var item = state.rows.filter(function (category) {
+          return String(category.id) === edit.getAttribute('data-category-edit');
+        })[0];
+        if (item) openCategoryForm(item);
+        return;
+      }
+      var remove = event.target.closest('[data-category-delete]');
+      if (!remove) return;
+      var id = remove.getAttribute('data-category-delete');
+      var name = remove.getAttribute('data-category-name');
+      ui.confirmDialog({
+        title: 'Delete category',
+        message: 'Delete "' + name + '"? Categories with documents cannot be deleted.',
+        confirmLabel: 'Delete'
+      }).then(function (confirmed) {
+        if (!confirmed) return;
+        return api.remove('/document-categories/' + encodeURIComponent(id)).then(function () {
+          ui.toast('Category deleted.', 'success');
+          return loadCategories();
+        }).catch(function (error) { ui.toast(error.message, 'error'); });
+      });
+    }
+  }
+
+  function renderError(error, heading) {
+    var empty = document.getElementById('resourceEmpty');
+    document.getElementById('resourceTableWrap').hidden = true;
+    document.getElementById('resourceMediaGrid').hidden = true;
+    document.getElementById('resourceFooter').hidden = true;
+    empty.hidden = false;
+    CMS.ui.renderEmpty(empty, { title: heading, text: error.message });
+    CMS.ui.toast(error.message, 'error');
   }
 
   document.addEventListener('DOMContentLoaded', function () {

@@ -9,6 +9,8 @@ use Illuminate\Validation\ValidationException;
 
 class SiteSettingsController extends Controller
 {
+    private const LAYOUT_SECTIONS = ['banner', 'featured_news', 'announcements', 'events', 'about'];
+
     private const RULES = [
         'website_name' => ['nullable', 'string', 'max:150'],
         'website_url' => ['nullable', 'url', 'max:255'],
@@ -22,12 +24,16 @@ class SiteSettingsController extends Controller
         'facebook_url' => ['nullable', 'url', 'max:255'],
         'twitter_url' => ['nullable', 'url', 'max:255'],
         'logo_media_id' => ['nullable', 'integer', 'exists:media,media_id'],
+        'header_layout' => ['nullable', 'string', 'in:logo-left,logo-center'],
+        'footer_layout' => ['nullable', 'string', 'in:three-columns,two-columns,simple'],
+        'menu_layout' => ['nullable', 'string', 'in:primary,compact'],
+        'homepage_section_order' => ['sometimes', 'array', 'size:5'],
     ];
 
     public function index(): JsonResponse
     {
         return response()->json([
-            'data' => DB::table('site_settings')->pluck('setting_value', 'setting_key'),
+            'data' => $this->settingsMap(),
         ]);
     }
 
@@ -49,13 +55,23 @@ class SiteSettingsController extends Controller
         foreach (self::RULES as $key => $rule) {
             $rules['settings.'.$key] = ['sometimes', ...$rule];
         }
+        if (array_key_exists('homepage_section_order', $settings)) {
+            $rules['settings.homepage_section_order.*'] = [
+                'required',
+                'string',
+                'distinct',
+                'in:'.implode(',', self::LAYOUT_SECTIONS),
+            ];
+        }
         $request->validate($rules);
 
         DB::transaction(function () use ($settings): void {
             foreach ($settings as $key => $value) {
                 $exists = DB::table('site_settings')->where('setting_key', $key)->exists();
                 $values = [
-                    'setting_value' => $value,
+                    'setting_value' => $key === 'homepage_section_order'
+                        ? json_encode(array_values($value), JSON_THROW_ON_ERROR)
+                        : $value,
                     'updated_at' => now(),
                 ];
 
@@ -69,7 +85,20 @@ class SiteSettingsController extends Controller
 
         return response()->json([
             'message' => 'Site settings saved.',
-            'data' => DB::table('site_settings')->pluck('setting_value', 'setting_key'),
+            'data' => $this->settingsMap(),
         ]);
+    }
+
+    private function settingsMap(): array
+    {
+        $settings = DB::table('site_settings')->pluck('setting_value', 'setting_key')->all();
+        if (isset($settings['homepage_section_order'])) {
+            $order = json_decode((string) $settings['homepage_section_order'], true);
+            if (is_array($order)) {
+                $settings['homepage_section_order'] = $order;
+            }
+        }
+
+        return $settings;
     }
 }
